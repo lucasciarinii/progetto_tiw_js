@@ -1,82 +1,48 @@
-/**
- * login.js
- * Gestisce il form di login: validazione lato client, chiamata fetch
- * all'API e redirect alla pagina del ruolo corretto.
- */
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('form-login');
+    const erroreBox = document.getElementById('errore-login');
+    const username = document.getElementById('username');
+    const password = document.getElementById('password');
 
-document.addEventListener("DOMContentLoaded", () => {
-    const form= document.getElementById("form-login");
-    const erroreBox= document.getElementById("errore-login");
-    const errUsername= document.getElementById("err-username");
-    const errPassword= document.getElementById("err-password");
-
-    form.addEventListener("submit", async (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        erroreBox.style.display = 'none';
+        erroreBox.textContent = 'Username o password non validi. Riprova.'
 
-        // puliamo eventuali errori precedenti
-        nascondiErrori();
-
-        const username = document.getElementById("username").value.trim();
-        const password = document.getElementById("password").value.trim();
-
-        // validazione lato client prima di fare la chiamata
-        let valido = true;
-
-        if (!username) {
-            errUsername.textContent = "Inserisci il tuo username";
-            errUsername.style.display = "block";
-            valido = false;
+        if (!username.value.trim() || !password.value.trim()) {
+            erroreBox.style.display = 'block';
+            return;
         }
-        if (!password) {
-            errPassword.textContent = "Inserisci la tua password";
-            errPassword.style.display = "block";
-            valido = false;
-        }
-        if (!valido) return;
 
         try {
-            const body = new URLSearchParams({ username, password });
-
-            const risposta = await fetch("api/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: body.toString()
+            const resp = await fetch('api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    username: username.value.trim(),
+                    password: password.value.trim()
+                }).toString()
             });
 
-            const dati = await risposta.json();
+            const data = await resp.json();
 
-            if (!risposta.ok) {
-                // il server ha risposto con un errore (401, 400, ecc.)
-                mostraErrore(dati.errore || "Credenziali non valide");
+            if (!resp.ok) {
+                erroreBox.textContent = data.errore || 'Username o password non validi. Riprova.';
+                erroreBox.style.display = 'block';
                 return;
             }
 
-            // login riuscito: redirect in base al ruolo
-            if (dati.ruolo === "FORNITORE") {
-                window.location.href = "fornitore.html";
-            } else if (dati.ruolo === "CLIENTE") {
-                window.location.href = "cliente.html";
+            if (data.ruolo === 'FORNITORE') {
+                window.location.href = 'fornitore.html';
+            } else if (data.ruolo === 'CLIENTE') {
+                window.location.href = 'cliente.html';
             } else {
-                mostraErrore("Ruolo non riconosciuto. Contattare l'amministratore.");
+                erroreBox.textContent = 'Ruolo non riconosciuto.';
+                erroreBox.style.display = 'block';
             }
-
         } catch (err) {
-            // errore di rete o parsing JSON fallito
-            mostraErrore("Errore di connessione al server. Riprova.");
+            erroreBox.textContent = 'Errore di connessione al server.';
+            erroreBox.style.display = 'block';
         }
     });
-
-    function mostraErrore(messaggio) {
-        erroreBox.textContent = messaggio;
-        erroreBox.style.display = "block";
-    }
-
-    function nascondiErrori() {
-        erroreBox.style.display = "none";
-        erroreBox.textContent = "";
-        errUsername.style.display = "none";
-        errUsername.textContent = "";
-        errPassword.style.display = "none";
-        errPassword.textContent = "";
-    }
 });
