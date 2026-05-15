@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/src/main/java/it/polimi/progetto_tiw_js/dao/ConfigurazioneDAO.java" value="9cc33ef3-b70c-4d29-b45c-47fa2bba7544" />
+    <file url="file://$PROJECT_DIR$/src/main/java/it/polimi/progetto_tiw_js/dao/ProdottoDAO.java" value="9cc33ef3-b70c-4d29-b45c-47fa2bba7544" />
+    <file url="file://$PROJECT_DIR$/src/main/java/it/polimi/progetto_tiw_js/dao/SKUDAO.java" value="9cc33ef3-b70c-4d29-b45c-47fa2bba7544" />
+    <file url="file://$PROJECT_DIR$/src/main/java/it/polimi/progetto_tiw_js/dao/UtenteDAO.java" value="9cc33ef3-b70c-4d29-b45c-47fa2bba7544" />
+  </component>
+</project>

@@ -1,4 +1,4 @@
-package it.polimi.progetto_tiw.beans;
+package it.polimi.progetto_tiw_js.beans;
 
 public class Utente {
 

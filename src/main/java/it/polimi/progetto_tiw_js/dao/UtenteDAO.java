@@ -1,5 +1,5 @@
-package it.polimi.progetto_tiw.dao;
-import it.polimi.progetto_tiw.beans.Utente;
+package it.polimi.progetto_tiw_js.dao;
+import it.polimi.progetto_tiw_js.beans.Utente;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

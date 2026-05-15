@@ -1,6 +1,6 @@
-package it.polimi.progetto_tiw.dao;
+package it.polimi.progetto_tiw_js.dao;
 
-import it.polimi.progetto_tiw.beans.SKU;
+import it.polimi.progetto_tiw_js.beans.SKU;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

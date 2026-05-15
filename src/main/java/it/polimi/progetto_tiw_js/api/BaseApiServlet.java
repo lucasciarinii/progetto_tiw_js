@@ -1,8 +1,8 @@
 package it.polimi.progetto_tiw_js.api;
 
+import it.polimi.progetto_tiw_js.beans.Utente;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import it.polimi.progetto_tiw_js.beans.Utente;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;

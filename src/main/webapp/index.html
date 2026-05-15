@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — Configuratore di Prodotto</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="login-body">
+
+<main class="login-card">
+    <div class="login-header">
+        <div class="app-title">Configuratore di prodotto</div>
+        <p class="login-subtitle">Accedi al tuo account</p>
+    </div>
+
+    <div id="errore-login" class="alert alert-error" style="display:none;">
+        Username o password non validi. Riprova.
+    </div>
+
+    <form id="form-login" method="post" novalidate>
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text"
+                   id="username"
+                   name="username"
+                   autocomplete="username"
+                   required
+                   autofocus>
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password"
+                   id="password"
+                   name="password"
+                   autocomplete="current-password"
+                   required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Accedi</button>
+    </form>
+    <p class="login-end">Mady by Luca Sciarini &amp; Leonardo Taccari</p>
+</main>
+
+<script src="js/login.js"></script>
+</body>
+</html>
