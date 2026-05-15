@@ -25,7 +25,7 @@ TIW2026-JS/
 └── src/
     └── main/
         ├── java/
-        │   └── it/polimi/tiw/js/
+        │   └── it/polimi/progetto_tiw_js/
         │       ├── beans/                    ← RIUSATI dalla versione HTML (invariati)
         │       │   ├── Utente.java
         │       │   ├── SKU.java
@@ -65,8 +65,9 @@ TIW2026-JS/
             ├── index.html                    ← pagina di login
             ├── fornitore.html                ← SPA fornitore (unica pagina)
             ├── cliente.html                  ← SPA cliente (unica pagina)
-            ├── css/
-            │   └── style.css                 ← RIUSATO dalla versione HTML (invariato)
+            ├── assets/
+               └── css/               
+                   └── style.css                 ← RIUSATO dalla versione HTML (invariato)
             └── js/
                 ├── login.js
                 ├── fornitore/
