@@ -71,7 +71,7 @@
 
 ---
 
-## PERSONA B — CLIENTE (questa chat)
+## PERSONA B — CLIENTE
 
 ### Servlet API da creare (`api/cliente/`)
 
