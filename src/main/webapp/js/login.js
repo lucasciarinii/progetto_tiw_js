@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const resp = await fetch('api/login', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({
                     username: username.value.trim(),

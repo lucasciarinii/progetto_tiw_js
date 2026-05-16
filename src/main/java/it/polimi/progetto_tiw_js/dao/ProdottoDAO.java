@@ -367,6 +367,72 @@ public class ProdottoDAO {
     // =========================
     // CONTROLLI VINCOLI
     // =========================
+    //Prossimi due metodi aggiunti per Javascript version
+
+    // Verifica se il prodotto possibileAntenatoId compare tra gli antenati
+    // del prodotto discendenteId. Serve per evitare cicli nella gerarchia.
+    public boolean isAncestor(int possibileAntenatoId, int discendenteId) throws SQLException {
+        String sql = "SELECT padre_id FROM prodotto WHERE id = ?";
+        Integer padreCorrente;
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            int nodoCorrente = discendenteId;
+
+            while (true) {
+                stmt.setInt(1, nodoCorrente);
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (!rs.next()) {
+                        return false;
+                    }
+
+                    padreCorrente = (Integer) rs.getObject("padre_id");
+                }
+
+                if (padreCorrente == null) {
+                    return false;
+                }
+
+                if (padreCorrente == possibileAntenatoId) {
+                    return true;
+                }
+
+                nodoCorrente = padreCorrente;
+            }
+        }
+    }
+
+    // Calcola la profondità del nodo nella gerarchia risalendo verso la radice.
+    // Un prodotto top-level ha profondità 0.
+    // Un figlio diretto del top-level ha profondità 1, e così via.
+    public int getDepth(int prodottoId) throws SQLException {
+        String sql = "SELECT padre_id FROM prodotto WHERE id = ?";
+        int profondita = 0;
+        Integer padreCorrente;
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            int nodoCorrente = prodottoId;
+
+            while (true) {
+                stmt.setInt(1, nodoCorrente);
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (!rs.next()) {
+                        return profondita;
+                    }
+
+                    padreCorrente = (Integer) rs.getObject("padre_id");
+                }
+
+                if (padreCorrente == null) {
+                    return profondita;
+                }
+
+                profondita++;
+                nodoCorrente = padreCorrente;
+            }
+        }
+    }
 
     // Verifica se esiste già un prodotto con lo stesso codice.
     public boolean existsByCodice(int codice) throws SQLException {

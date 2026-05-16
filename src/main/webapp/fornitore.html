@@ -1,10 +1,303 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fornitore</title>
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-FORNITORE
+
+<!--
+  SPA del fornitore.
+
+  Nota:
+  - questa pagina sostituisce la vecchia HomeFornitore + RicercaProdotti
+  - i contenuti dinamici vengono riempiti via JavaScript
+  - le classi CSS restano quelle del progetto HTML, così la grafica non cambia
+-->
+
+<!-- =========================
+     SEZIONE HOME FORNITORE
+========================= -->
+<section id="sezione-home">
+    <header class="navbar">
+        <div class="navbar-brand">Pannello Fornitore</div>
+
+        <div class="navbar-user">
+            Ciao
+            <span id="utente-nome">Mario</span>
+            <span id="utente-cognome">Rossi</span>
+        </div>
+
+        <ul class="navbar-links">
+            <li>
+                <a href="#" id="link-ricerca-prodotti">Ricerca prodotti</a>
+            </li>
+            <li>
+                <button type="button" id="btn-logout-home" class="btn btn-danger btn-sm">Logout</button>
+            </li>
+        </ul>
+    </header>
+
+    <main class="main-content">
+        <div class="page-wrapper">
+            <h1 class="page-title">Home Fornitore</h1>
+
+            <!-- Messaggi lato client: errori / successi delle fetch -->
+            <div id="message-box-home" class="alert" hidden></div>
+
+            <div class="two-columns">
+                <!-- Colonna principale -->
+                <section class="stack-lg">
+
+                    <!-- FORM 1: Nuova SKU -->
+                    <div class="card">
+                        <h2 class="card-title">Nuova SKU</h2>
+
+                        <form id="form-crea-sku" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label for="skuCodice">Codice</label>
+                                <input id="skuCodice"
+                                       type="number"
+                                       name="codice"
+                                       min="0"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="skuNome">Nome</label>
+                                <input id="skuNome"
+                                       type="text"
+                                       name="nome"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="skuDescrizione">Descrizione tecnica</label>
+                                <textarea id="skuDescrizione"
+                                          name="descrizioneTecnica"
+                                          rows="4"
+                                          required></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="skuPrezzo">Prezzo</label>
+                                <input id="skuPrezzo"
+                                       type="number"
+                                       name="prezzo"
+                                       min="0"
+                                       step="0.01"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="skuFoto">Fotografia</label>
+                                <input id="skuFoto"
+                                       type="file"
+                                       name="fotografia"
+                                       accept="image/*">
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Salva SKU</button>
+                        </form>
+                    </div>
+
+                    <!-- FORM 2: Nuovo prodotto semplice -->
+                    <div class="card">
+                        <h2 class="card-title">Nuovo prodotto semplice</h2>
+
+                        <form id="form-crea-semplice">
+                            <div class="form-group">
+                                <label for="sempliceCodice">Codice</label>
+                                <input id="sempliceCodice"
+                                       type="number"
+                                       name="codice"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="sempliceNome">Nome</label>
+                                <input id="sempliceNome"
+                                       type="text"
+                                       name="nome"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>SKU associate</label>
+
+                                <div id="lista-sku-disponibili" class="checkbox-list"></div>
+
+                                <p id="hint-sku-vuote" class="form-hint" hidden>
+                                    Nessuna SKU disponibile. Crea prima almeno una SKU.
+                                </p>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Salva prodotto semplice</button>
+                        </form>
+                    </div>
+
+                    <!-- FORM 3: Nuovo prodotto composto -->
+                    <div class="card">
+                        <h2 class="card-title">Nuovo prodotto composto</h2>
+
+                        <form id="form-crea-composto">
+                            <div class="form-group">
+                                <label for="compostoCodice">Codice</label>
+                                <input id="compostoCodice"
+                                       type="number"
+                                       name="codice"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="compostoNome">Nome</label>
+                                <input id="compostoNome"
+                                       type="text"
+                                       name="nome"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="compostoDescrizione">Descrizione</label>
+                                <textarea id="compostoDescrizione"
+                                          name="descrizione"
+                                          rows="4"
+                                          required></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="prezzoMin">Prezzo minimo</label>
+                                <input id="prezzoMin"
+                                       type="number"
+                                       name="prezzoMin"
+                                       min="0"
+                                       step="0.01"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="prezzoMax">Prezzo massimo</label>
+                                <input id="prezzoMax"
+                                       type="number"
+                                       name="prezzoMax"
+                                       min="0"
+                                       step="0.01"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Sottoprodotti selezionabili</label>
+
+                                <div id="lista-prodotti-disponibili" class="checkbox-list"></div>
+
+                                <p id="hint-prodotti-vuoti" class="form-hint" hidden>
+                                    Nessun prodotto disponibile. I sottoprodotti devono essere prodotti senza padre.
+                                </p>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Salva prodotto composto</button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Colonna laterale: dettaglio -->
+                <aside class="side-panel">
+                    <div class="card">
+                        <h2 class="card-title">Dettaglio</h2>
+
+                        <div id="dettaglio-content">
+                            <p class="muted">
+                                Dopo una creazione o una ricerca, qui comparirà il dettaglio dell'oggetto selezionato.
+                            </p>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </main>
+</section>
+
+<!-- =========================
+     SEZIONE RICERCA
+========================= -->
+<section id="sezione-ricerca" hidden>
+    <header class="navbar">
+        <div class="navbar-brand">Configuratore</div>
+
+        <ul class="navbar-links">
+            <li>
+                <a href="#" id="link-home-fornitore">Home</a>
+            </li>
+        </ul>
+
+        <div class="navbar-user">
+            Ciao
+            <span id="utente-nome-ricerca">Mario</span>
+            <span id="utente-cognome-ricerca">Rossi</span>
+        </div>
+
+        <ul class="navbar-links">
+            <li>
+                <button type="button" id="btn-logout-ricerca" class="btn btn-danger btn-sm">Logout</button>
+            </li>
+        </ul>
+    </header>
+
+    <main class="main-content">
+        <div class="page-wrapper">
+            <h1 class="page-title">Ricerca prodotti</h1>
+
+            <div id="message-box-ricerca" class="alert" hidden></div>
+
+            <div class="card">
+                <div class="form-group ricerca-toolbar">
+                    <label for="input-ricerca">Cerca per nome o codice</label>
+                    <input id="input-ricerca"
+                           type="text"
+                           placeholder="Inserisci una parola chiave">
+                    <button type="button" id="btn-cerca" class="btn btn-primary">Cerca</button>
+                </div>
+            </div>
+
+            <div class="two-columns">
+                <!-- Risultati -->
+                <section class="stack-lg">
+                    <div class="card">
+                        <h2 class="card-title">Risultati</h2>
+
+                        <div id="ricerca-risultati">
+                            <p class="muted">
+                                Inserisci una parola chiave per cercare prodotti e SKU.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Dettaglio risultato -->
+                <aside class="side-panel">
+                    <div class="card">
+                        <h2 class="card-title">Dettaglio</h2>
+
+                        <div id="ricerca-dettaglio">
+                            <p class="muted">
+                                Seleziona un risultato per vedere i dettagli.
+                            </p>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </main>
+</section>
+
+<!-- Script della SPA fornitore -->
+<script src="js/sku.js"></script>
+<script src="js/prodotto.js"></script>
+<script src="js/ricerca.js"></script>
+<script src="js/main.js"></script>
+
+
 </body>
 </html>
