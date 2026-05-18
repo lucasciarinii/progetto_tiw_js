@@ -55,7 +55,22 @@ public abstract class BaseApiServlet extends HttpServlet {
                 conn.close();
             }
         } catch (SQLException ignored) {
-            // siamo in chiusura, non c'è altro da fare
+        }
+
+        try {
+            com.mysql.cj.jdbc.AbandonedConnectionCleanupThread.checkedShutdown();
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            java.util.Enumeration<java.sql.Driver> drivers = java.sql.DriverManager.getDrivers();
+            while (drivers.hasMoreElements()) {
+                java.sql.Driver driver = drivers.nextElement();
+                if (driver.getClass().getName().equals("com.mysql.cj.jdbc.Driver")) {
+                    java.sql.DriverManager.deregisterDriver(driver);
+                }
+            }
+        } catch (SQLException ignored) {
         }
     }
 

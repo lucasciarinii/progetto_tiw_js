@@ -659,4 +659,47 @@ public class ProdottoDAO {
             raccogliProdottiSemplici(figlio.getId(), prodottiSemplici);
         }
     }
+    // Aggiorna il nome del prodotto.
+    public void updateNome(int id, String nome) throws SQLException {
+        String sql = "UPDATE prodotto SET nome = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, nome);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
+
+    // Aggiorna la descrizione del prodotto composto.
+    public void updateDescrizione(int id, String descrizione) throws SQLException {
+        String sql = "UPDATE prodotto SET descrizione = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, descrizione);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
+
+    // Aggiorna il prezzo minimo del prodotto composto.
+    public void updatePrezzoMin(int id, double prezzoMin) throws SQLException {
+        String sql = "UPDATE prodotto SET prezzo_min = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setDouble(1, prezzoMin);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
+
+    // Aggiorna il prezzo massimo del prodotto composto.
+    public void updatePrezzoMax(int id, double prezzoMax) throws SQLException {
+        String sql = "UPDATE prodotto SET prezzo_max = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setDouble(1, prezzoMax);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
 }

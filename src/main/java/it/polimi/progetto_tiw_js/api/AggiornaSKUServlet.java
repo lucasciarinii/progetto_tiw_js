@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 @WebServlet("/apifornitoreskuaggiorna")
@@ -27,17 +26,20 @@ public class AggiornaSKUServlet extends BaseApiServlet {
         String campo = req.getParameter("campo");
         String valore = req.getParameter("valore");
 
-        if (idParam == null || idParam.isBlank()
-                || campo == null || campo.isBlank()
-                || valore == null) {
+        if (isBlank(idParam) || isBlank(campo) || valore == null) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Parametri mancanti");
             return;
         }
 
         int id;
         try {
-            id = Integer.parseInt(idParam);
+            id = Integer.parseInt(idParam.trim());
         } catch (NumberFormatException e) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Id non valido");
+            return;
+        }
+
+        if (id <= 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Id non valido");
             return;
         }
@@ -51,33 +53,36 @@ public class AggiornaSKUServlet extends BaseApiServlet {
                 return;
             }
 
-            switch (campo) {
+            String campoPulito = campo.trim();
+
+            switch (campoPulito) {
                 case "nome" -> {
                     String nome = valore.trim();
+
                     if (nome.isBlank()) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il nome non può essere vuoto");
                         return;
                     }
-                    aggiornaCampoTesto("UPDATE sku SET nome = ? WHERE id = ?", nome, id);
+
+                    skuDAO.updateNome(id, nome);
                 }
 
                 case "descrizioneTecnica" -> {
                     String descrizione = valore.trim();
+
                     if (descrizione.isBlank()) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "La descrizione tecnica non può essere vuota");
                         return;
                     }
-                    aggiornaCampoTesto(
-                            "UPDATE sku SET descrizione_tecnica = ? WHERE id = ?",
-                            descrizione,
-                            id
-                    );
+
+                    skuDAO.updateDescrizioneTecnica(id, descrizione);
                 }
 
                 case "prezzo" -> {
                     double prezzo;
+
                     try {
                         prezzo = Double.parseDouble(valore.trim());
                     } catch (NumberFormatException e) {
@@ -92,7 +97,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
                         return;
                     }
 
-                    aggiornaPrezzo(id, prezzo);
+                    skuDAO.updatePrezzo(id, prezzo);
                 }
 
                 default -> {
@@ -110,21 +115,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
         }
     }
 
-    private void aggiornaCampoTesto(String sql, String valore, int id) throws SQLException {
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, valore);
-            stmt.setInt(2, id);
-            stmt.executeUpdate();
-        }
-    }
-
-    private void aggiornaPrezzo(int id, double prezzo) throws SQLException {
-        String sql = "UPDATE sku SET prezzo = ? WHERE id = ?";
-
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setDouble(1, prezzo);
-            stmt.setInt(2, id);
-            stmt.executeUpdate();
-        }
+    private boolean isBlank(String valore) {
+        return valore == null || valore.isBlank();
     }
 }

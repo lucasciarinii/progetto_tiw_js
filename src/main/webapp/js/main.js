@@ -1,3 +1,47 @@
+console.log('=== MAIN JS CARICATO DAVVERO ===');
+alert('MAIN JS CARICATO DAVVERO');
+window.appFornitore = {
+    getUtente() {
+        return null;
+    },
+
+    getSezioneCorrente() {
+        return 'home';
+    },
+
+    mostraSezione() {},
+
+    mostraMessaggioHome(testo, tipo) {
+        console.log('[HOME][' + tipo + ']', testo);
+    },
+
+    mostraMessaggioRicerca(testo, tipo) {
+        console.log('[RICERCA][' + tipo + ']', testo);
+    },
+
+    mostraMessaggioCorrente(testo, tipo) {
+        console.log('[CORRENTE][' + tipo + ']', testo);
+    },
+
+    nascondiMessaggi() {},
+
+    async parseJsonResponse(response) {
+        let data = null;
+
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = null;
+        }
+
+        if (!response.ok) {
+            throw new Error(data?.errore || 'Richiesta non riuscita.');
+        }
+
+        return data;
+    }
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
     const sezioneHome = document.getElementById('sezione-home');
     const sezioneRicerca = document.getElementById('sezione-ricerca');
@@ -24,6 +68,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     inizializzaEventi();
     await controllaSessione();
     mostraSezione('home');
+
+    window.appFornitore = {
+        getUtente() {
+            return statoPagina.utente;
+        },
+
+        getSezioneCorrente() {
+            return statoPagina.sezioneCorrente;
+        },
+
+        mostraSezione,
+        mostraMessaggioHome,
+        mostraMessaggioRicerca,
+        mostraMessaggioCorrente,
+        nascondiMessaggi,
+
+        async parseJsonResponse(response) {
+            const data = await leggiJsonSicuro(response);
+
+            if (!response.ok) {
+                throw new Error(data?.errore || 'Richiesta non riuscita.');
+            }
+
+            return data;
+        }
+    };
+
     inizializzaModuliFigli();
 
     function inizializzaEventi() {
@@ -64,12 +135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const data = await leggiJsonSicuro(resp);
 
-            if (!resp.ok) {
-                window.location.href = 'index.html';
-                return;
-            }
-
-            if (!data || !data.loggedIn) {
+            if (!resp.ok || !data || !data.loggedIn) {
                 window.location.href = 'index.html';
                 return;
             }
@@ -98,15 +164,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function mostraSezione(nomeSezione) {
+        nascondiMessaggi();
+
         if (nomeSezione === 'ricerca') {
-            sezioneHome.hidden = true;
-            sezioneRicerca.hidden = false;
+            if (sezioneHome) sezioneHome.hidden = true;
+            if (sezioneRicerca) sezioneRicerca.hidden = false;
             statoPagina.sezioneCorrente = 'ricerca';
+
+            const inputRicerca = document.getElementById('input-ricerca');
+            if (inputRicerca) {
+                inputRicerca.focus();
+            }
             return;
         }
 
-        sezioneHome.hidden = false;
-        sezioneRicerca.hidden = true;
+        if (sezioneHome) sezioneHome.hidden = false;
+        if (sezioneRicerca) sezioneRicerca.hidden = true;
         statoPagina.sezioneCorrente = 'home';
     }
 
@@ -187,41 +260,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function inizializzaModuliFigli() {
         if (window.skuPage && typeof window.skuPage.init === 'function') {
-            window.skuPage.init();
+            window.skuPage.init().catch(err => console.error('[main.js] errore skuPage', err));
         }
 
         if (window.prodottoPage && typeof window.prodottoPage.init === 'function') {
-            window.prodottoPage.init();
+            window.prodottoPage.init().catch(err => console.error('[main.js] errore prodottoPage', err));
         }
 
         if (window.ricercaPage && typeof window.ricercaPage.init === 'function') {
-            window.ricercaPage.init();
+            window.ricercaPage.init().catch(err => console.error('[main.js] errore ricercaPage', err));
         }
     }
-
-    window.appFornitore = {
-        getUtente() {
-            return statoPagina.utente;
-        },
-
-        getSezioneCorrente() {
-            return statoPagina.sezioneCorrente;
-        },
-
-        mostraSezione,
-        mostraMessaggioHome,
-        mostraMessaggioRicerca,
-        mostraMessaggioCorrente,
-        nascondiMessaggi,
-
-        async parseJsonResponse(response) {
-            const data = await leggiJsonSicuro(response);
-
-            if (!response.ok) {
-                throw new Error(data?.errore || 'Richiesta non riuscita.');
-            }
-
-            return data;
-        }
-    };
 });

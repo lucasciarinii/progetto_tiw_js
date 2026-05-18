@@ -7,12 +7,8 @@ import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.Part;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 
 @WebServlet("/apifornitoreskucrea")
@@ -28,17 +24,14 @@ public class CreaSKUServlet extends BaseApiServlet {
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
-        String codiceParam = leggiCampoMultipart(req, "codice");
-        String nome = leggiCampoMultipart(req, "nome");
-        String descrizioneTecnica = leggiCampoMultipart(req, "descrizioneTecnica");
-        String prezzoParam = leggiCampoMultipart(req, "prezzo");
+        String codiceParam = req.getParameter("codice");
+        String nome = req.getParameter("nome");
+        String descrizioneTecnica = req.getParameter("descrizioneTecnica");
+        String prezzoParam = req.getParameter("prezzo");
 
         String fotografia = null;
 
-        if (codiceParam == null || codiceParam.isBlank()
-                || nome == null || nome.isBlank()
-                || descrizioneTecnica == null || descrizioneTecnica.isBlank()
-                || prezzoParam == null || prezzoParam.isBlank()) {
+        if (isBlank(codiceParam) || isBlank(nome) || isBlank(descrizioneTecnica) || isBlank(prezzoParam)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Tutti i campi obbligatori devono essere compilati");
             return;
@@ -93,23 +86,7 @@ public class CreaSKUServlet extends BaseApiServlet {
         }
     }
 
-    private String leggiCampoMultipart(HttpServletRequest req, String nomeCampo)
-            throws IOException, ServletException {
-
-        Part part = req.getPart(nomeCampo);
-        if (part == null) {
-            return null;
-        }
-
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(part.getInputStream(), StandardCharsets.UTF_8))) {
-
-            StringBuilder sb = new StringBuilder();
-            String riga;
-            while ((riga = reader.readLine()) != null) {
-                sb.append(riga);
-            }
-            return sb.toString();
-        }
+    private boolean isBlank(String valore) {
+        return valore == null || valore.isBlank();
     }
 }

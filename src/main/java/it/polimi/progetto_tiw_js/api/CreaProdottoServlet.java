@@ -3,6 +3,7 @@ package it.polimi.progetto_tiw_js.api;
 import it.polimi.progetto_tiw_js.beans.Prodotto;
 import it.polimi.progetto_tiw_js.dao.ProdottoDAO;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -10,12 +11,16 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @WebServlet("/apifornitoreprodottocrea")
+@MultipartConfig
 public class CreaProdottoServlet extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
+    private static final int MAX_PROFONDITA = 3;
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
@@ -28,9 +33,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
         String codiceParam = req.getParameter("codice");
         String nome = req.getParameter("nome");
 
-        if (tipo == null || tipo.isBlank()
-                || codiceParam == null || codiceParam.isBlank()
-                || nome == null || nome.isBlank()) {
+        if (isBlank(tipo) || isBlank(codiceParam) || isBlank(nome)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametri obbligatori mancanti");
             return;
@@ -59,17 +62,20 @@ public class CreaProdottoServlet extends BaseApiServlet {
                 return;
             }
 
-            if ("SEMPLICE".equalsIgnoreCase(tipo.trim())) {
+            String tipoPulito = tipo.trim().toUpperCase();
+
+            if ("SEMPLICE".equals(tipoPulito)) {
                 creaProdottoSemplice(req, resp, prodottoDAO, codice, nome.trim());
                 return;
             }
 
-            if ("COMPOSTO".equalsIgnoreCase(tipo.trim())) {
+            if ("COMPOSTO".equals(tipoPulito)) {
                 creaProdottoComposto(req, resp, prodottoDAO, codice, nome.trim());
                 return;
             }
 
-            sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Tipo prodotto non valido");
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Tipo prodotto non valido");
 
         } catch (SQLException e) {
             throw new ServletException("Errore durante la creazione del prodotto", e);
@@ -119,9 +125,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
         String prezzoMaxParam = req.getParameter("prezzoMax");
         String[] figlioIdParams = req.getParameterValues("figlioIds");
 
-        if (descrizione == null || descrizione.isBlank()
-                || prezzoMinParam == null || prezzoMinParam.isBlank()
-                || prezzoMaxParam == null || prezzoMaxParam.isBlank()) {
+        if (isBlank(descrizione) || isBlank(prezzoMinParam) || isBlank(prezzoMaxParam)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Compila tutti i campi del prodotto composto");
             return;
@@ -157,7 +161,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return;
         }
 
-        List<Integer> figlioIds = new ArrayList<>();
+        Set<Integer> figlioIds = new LinkedHashSet<>();
 
         for (String figlioIdParam : figlioIdParams) {
             try {
@@ -165,6 +169,29 @@ public class CreaProdottoServlet extends BaseApiServlet {
             } catch (NumberFormatException e) {
                 sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                         "Uno dei sottoprodotti selezionati non è valido");
+                return;
+            }
+        }
+
+        for (Integer figlioId : figlioIds) {
+            Prodotto figlio = prodottoDAO.findById(figlioId);
+
+            if (figlio == null) {
+                sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                        "Uno dei sottoprodotti selezionati non esiste");
+                return;
+            }
+
+            if (figlio.getPadreId() != null) {
+                sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                        "Uno dei sottoprodotti selezionati ha già un padre");
+                return;
+            }
+
+            int altezzaSottoalbero = prodottoDAO.getSubtreeHeight(figlioId);
+            if (altezzaSottoalbero + 1 > MAX_PROFONDITA) {
+                sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                        "Profondità massima superata");
                 return;
             }
         }
@@ -178,29 +205,14 @@ public class CreaProdottoServlet extends BaseApiServlet {
         );
 
         for (Integer figlioId : figlioIds) {
-            if (figlioId == prodottoId) {
-                sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                        "Un prodotto non può contenere se stesso");
-                return;
-            }
-
-            if (prodottoDAO.isAncestor(figlioId, prodottoId)) {
-                sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                        "Operazione non consentita: ciclo nella gerarchia");
-                return;
-            }
-
-            int profonditaFiglio = prodottoDAO.getDepth(figlioId);
-            if (profonditaFiglio + 1 > 3) {
-                sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                        "Profondità massima superata");
-                return;
-            }
-
             prodottoDAO.setPadre(figlioId, prodottoId);
         }
 
         Prodotto prodottoCreato = prodottoDAO.findByIdConDiscendenti(prodottoId);
         sendJson(resp, prodottoCreato);
+    }
+
+    private boolean isBlank(String valore) {
+        return valore == null || valore.isBlank();
     }
 }

@@ -166,4 +166,37 @@ public class SKUDAO {
 
         return false;
     }
+
+    // Aggiorna il nome della SKU.
+    public void updateNome(int id, String nome) throws SQLException {
+        String sql = "UPDATE sku SET nome = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, nome);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
+
+    // Aggiorna la descrizione tecnica della SKU.
+    public void updateDescrizioneTecnica(int id, String descrizioneTecnica) throws SQLException {
+        String sql = "UPDATE sku SET descrizione_tecnica = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, descrizioneTecnica);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
+
+    // Aggiorna il prezzo della SKU.
+    public void updatePrezzo(int id, double prezzo) throws SQLException {
+        String sql = "UPDATE sku SET prezzo = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setDouble(1, prezzo);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
 }

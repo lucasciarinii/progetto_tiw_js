@@ -40,8 +40,9 @@ window.skuPage = (function () {
             if (window.prodottoPage && typeof window.prodottoPage.aggiornaListaSku === 'function') {
                 window.prodottoPage.aggiornaListaSku(stato.listaSku);
             }
+
         } catch (error) {
-            console.error('Errore durante il caricamento delle SKU:', error);
+            console.error('[sku.js] errore caricamento SKU:', error);
             window.appFornitore.mostraMessaggioHome(
                 error.message || 'Errore durante il caricamento delle SKU.',
                 'error'
@@ -75,19 +76,9 @@ window.skuPage = (function () {
             const testo = document.createElement('span');
             testo.textContent = `${sku.codice} - ${sku.nome} - €${formattaPrezzo(sku.prezzo)}`;
 
-            label.addEventListener('click', (event) => {
-                if (event.target.tagName.toLowerCase() === 'input') {
-                    return;
-                }
-
-                if (event.altKey) {
-                    event.preventDefault();
-                    mostraDettaglioSku(sku);
-                }
-            });
-
             label.appendChild(input);
             label.appendChild(testo);
+
             listaSkuDisponibili.appendChild(label);
         });
     }
@@ -123,7 +114,7 @@ window.skuPage = (function () {
                 renderMessaggioDettaglioVuoto();
             }
         } catch (error) {
-            console.error('Errore durante la creazione della SKU:', error);
+            console.error('[sku.js] errore creazione SKU:', error);
             window.appFornitore.mostraMessaggioHome(
                 error.message || 'Errore durante la creazione della SKU.',
                 'error'
@@ -142,7 +133,7 @@ window.skuPage = (function () {
             return false;
         }
 
-        if (Number.isNaN(Number(codice)) || Number(codice) < 0) {
+        if (!Number.isInteger(Number(codice)) || Number(codice) < 0) {
             window.appFornitore.mostraMessaggioHome('Il codice deve essere un numero intero valido.', 'error');
             return false;
         }
@@ -156,7 +147,7 @@ window.skuPage = (function () {
     }
 
     function mostraDettaglioSku(sku) {
-        stato.skuSelezionata = sku;
+        stato.skuSelezionata = { ...sku };
 
         if (!dettaglioContent) {
             return;
@@ -170,6 +161,14 @@ window.skuPage = (function () {
         titolo.className = 'section-title';
         titolo.textContent = sku.nome || 'SKU';
         wrapper.appendChild(titolo);
+
+        const nomeEditabile = creaCampoEditabile({
+            etichetta: 'Nome',
+            valore: sku.nome || '',
+            chiave: 'nome',
+            multilinea: false
+        });
+        wrapper.appendChild(nomeEditabile);
 
         const codice = document.createElement('p');
         codice.innerHTML = `<strong>Codice:</strong> <span>${escapeHtml(sku.codice)}</span>`;
@@ -202,18 +201,9 @@ window.skuPage = (function () {
         });
         wrapper.appendChild(descrizione);
 
-        const nomeEditabile = creaCampoEditabile({
-            etichetta: 'Nome',
-            valore: sku.nome || '',
-            chiave: 'nome',
-            multilinea: false
-        });
-        wrapper.insertBefore(nomeEditabile, codice);
-
         const prezzoBox = document.createElement('p');
         prezzoBox.className = 'price-line';
         prezzoBox.innerHTML = `<span>€${formattaPrezzo(sku.prezzo)}</span>`;
-        prezzoBox.dataset.ruolo = 'prezzo-view';
         wrapper.appendChild(prezzoBox);
 
         const azioni = document.createElement('div');
@@ -224,10 +214,38 @@ window.skuPage = (function () {
         btnModificaPrezzo.className = 'btn btn-outline btn-sm';
         btnModificaPrezzo.textContent = 'Modifica prezzo';
         btnModificaPrezzo.addEventListener('click', () => {
-            sostituisciPrezzoConInput(prezzoBox, sku);
+            sostituisciPrezzoConInput(prezzoBox);
+        });
+
+        const btnEliminaSku = document.createElement('button');
+        btnEliminaSku.type = 'button';
+        btnEliminaSku.className = 'btn btn-danger btn-sm';
+        btnEliminaSku.textContent = 'Elimina SKU';
+        btnEliminaSku.addEventListener('click', async () => {
+            const conferma = window.confirm('Vuoi eliminare questa SKU?');
+            if (!conferma) {
+                return;
+            }
+
+            try {
+                await eliminaSku(sku.id);
+
+                stato.skuSelezionata = null;
+                window.appFornitore.mostraMessaggioHome('SKU eliminata con successo.', 'success');
+
+                await caricaListaSku();
+                renderMessaggioDettaglioVuoto();
+            } catch (error) {
+                console.error('[sku.js] errore eliminazione SKU:', error);
+                window.appFornitore.mostraMessaggioHome(
+                    error.message || 'Errore durante l\'eliminazione della SKU.',
+                    'error'
+                );
+            }
         });
 
         azioni.appendChild(btnModificaPrezzo);
+        azioni.appendChild(btnEliminaSku);
         wrapper.appendChild(azioni);
 
         dettaglioContent.appendChild(wrapper);
@@ -259,12 +277,15 @@ window.skuPage = (function () {
             }
 
             input.value = valore || '';
-            input.rows = multilinea ? 4 : undefined;
+            if (multilinea) {
+                input.rows = 4;
+            }
 
             input.addEventListener('blur', async () => {
                 const nuovoValore = input.value.trim();
+                const valoreAttuale = (stato.skuSelezionata && stato.skuSelezionata[chiave]) || '';
 
-                if (nuovoValore === (valore || '')) {
+                if (nuovoValore === valoreAttuale) {
                     container.replaceChild(view, input);
                     return;
                 }
@@ -272,21 +293,13 @@ window.skuPage = (function () {
                 try {
                     await aggiornaCampoSku(chiave, nuovoValore);
 
-                    if (chiave === 'nome') {
-                        stato.skuSelezionata.nome = nuovoValore;
-                    }
-
-                    if (chiave === 'descrizioneTecnica') {
-                        stato.skuSelezionata.descrizioneTecnica = nuovoValore;
-                    }
-
-                    view.textContent = nuovoValore || '-';
+                    stato.skuSelezionata[chiave] = nuovoValore;
                     window.appFornitore.mostraMessaggioHome('SKU aggiornata con successo.', 'success');
 
                     await caricaListaSku();
                     mostraDettaglioSku(stato.skuSelezionata);
                 } catch (error) {
-                    console.error('Errore durante l’aggiornamento della SKU:', error);
+                    console.error('[sku.js] errore aggiornamento campo SKU:', error);
                     window.appFornitore.mostraMessaggioHome(
                         error.message || 'Aggiornamento non riuscito.',
                         'error'
@@ -314,12 +327,12 @@ window.skuPage = (function () {
         return container;
     }
 
-    function sostituisciPrezzoConInput(prezzoBox, sku) {
+    function sostituisciPrezzoConInput(prezzoBox) {
         const input = document.createElement('input');
         input.type = 'number';
         input.min = '0';
         input.step = '0.01';
-        input.value = sku.prezzo ?? '';
+        input.value = stato.skuSelezionata?.prezzo ?? '';
         input.style.maxWidth = '180px';
 
         prezzoBox.replaceWith(input);
@@ -343,7 +356,7 @@ window.skuPage = (function () {
                 await caricaListaSku();
                 mostraDettaglioSku(stato.skuSelezionata);
             } catch (error) {
-                console.error('Errore durante l’aggiornamento del prezzo:', error);
+                console.error('[sku.js] errore aggiornamento prezzo:', error);
                 window.appFornitore.mostraMessaggioHome(
                     error.message || 'Aggiornamento prezzo non riuscito.',
                     'error'
@@ -387,6 +400,24 @@ window.skuPage = (function () {
         return window.appFornitore.parseJsonResponse(response);
     }
 
+    async function eliminaSku(skuId) {
+        const body = new URLSearchParams();
+        body.append('id', skuId);
+        body.append('tipo', 'SKU');
+
+        const response = await fetch('apifornitoreoggettoelimina', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+            },
+            body: body.toString()
+        });
+
+        return window.appFornitore.parseJsonResponse(response);
+    }
+
     function renderMessaggioDettaglioVuoto() {
         if (!dettaglioContent) {
             return;
@@ -401,12 +432,7 @@ window.skuPage = (function () {
 
     function formattaPrezzo(prezzo) {
         const numero = Number(prezzo);
-
-        if (Number.isNaN(numero)) {
-            return '0.00';
-        }
-
-        return numero.toFixed(2);
+        return Number.isNaN(numero) ? '0.00' : numero.toFixed(2);
     }
 
     function escapeHtml(valore) {
