@@ -13,12 +13,11 @@ import java.io.IOException;
 import java.sql.SQLException;
 
 /**
- * Gestisce il login: legge le credenziali, le verifica sul DB,
- * salva l'utente in sessione e risponde con il ruolo.
- * Il redirect alla pagina giusta lo fa il JS lato client.
+ * Esegue il login: verifica le credenziali, salva l'utente in sessione
+ * e restituisce i dati minimi necessari al frontend.
  */
 @WebServlet("/api/login")
-public class CheckLoginServlet extends BaseApiServlet {
+public class LoginServlet extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 
@@ -31,9 +30,9 @@ public class CheckLoginServlet extends BaseApiServlet {
         String username = req.getParameter("username");
         String password = req.getParameter("password");
 
-        // validazione base: campi obbligatori
         if (isBlank(username) || isBlank(password)) {
-            sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Username e password sono obbligatori");
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Username e password sono obbligatori");
             return;
         }
 
@@ -42,19 +41,19 @@ public class CheckLoginServlet extends BaseApiServlet {
             Utente utente = utenteDAO.checkCredentials(username.trim(), password.trim());
 
             if (utente == null) {
-                sendError(resp, HttpServletResponse.SC_UNAUTHORIZED, "Credenziali non valide");
+                sendError(resp, HttpServletResponse.SC_UNAUTHORIZED,
+                        "Credenziali non valide");
                 return;
             }
 
-            // creo la sessione e ci salvo l'utente
             HttpSession session = req.getSession(true);
             session.setAttribute("utente", utente);
 
-            // rispondo col ruolo — il JS decide su quale pagina andare
             JsonObject risposta = new JsonObject();
             risposta.addProperty("ruolo", utente.getRuolo());
             risposta.addProperty("nome", utente.getNome());
             risposta.addProperty("cognome", utente.getCognome());
+
             sendJson(resp, risposta);
 
         } catch (SQLException e) {

@@ -1,7 +1,9 @@
 package it.polimi.progetto_tiw_js.api;
 
+import com.google.gson.Gson;
 import it.polimi.progetto_tiw_js.beans.Prodotto;
 import it.polimi.progetto_tiw_js.dao.ProdottoDAO;
+import it.polimi.progetto_tiw_js.dao.SKUDAO;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
@@ -13,6 +15,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @WebServlet("/apifornitoreprodottocrea")
@@ -22,12 +25,34 @@ public class CreaProdottoServlet extends BaseApiServlet {
     private static final long serialVersionUID = 1L;
     private static final int MAX_PROFONDITA = 3;
 
+    private final Gson gson = new Gson();
+
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
+
+        try {
+            String contentType = req.getContentType();
+
+            // Se arriva JSON, allora siamo nel flusso nuovo del builder composto.
+            if (contentType != null && contentType.toLowerCase().contains("application/json")) {
+                gestisciCreazioneCompostoDaJson(req, resp);
+                return;
+            }
+
+            // Altrimenti teniamo il comportamento classico a parametri.
+            gestisciCreazioneDaParametri(req, resp);
+
+        } catch (SQLException e) {
+            throw new ServletException("Errore durante la creazione del prodotto", e);
+        }
+    }
+
+    private void gestisciCreazioneDaParametri(HttpServletRequest req, HttpServletResponse resp)
+            throws SQLException, IOException {
 
         String tipo = req.getParameter("tipo");
         String codiceParam = req.getParameter("codice");
@@ -53,33 +78,28 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return;
         }
 
-        try {
-            ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
+        ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
 
-            if (prodottoDAO.existsByCodice(codice)) {
-                sendError(resp, HttpServletResponse.SC_CONFLICT,
-                        "Esiste già un prodotto con questo codice");
-                return;
-            }
-
-            String tipoPulito = tipo.trim().toUpperCase();
-
-            if ("SEMPLICE".equals(tipoPulito)) {
-                creaProdottoSemplice(req, resp, prodottoDAO, codice, nome.trim());
-                return;
-            }
-
-            if ("COMPOSTO".equals(tipoPulito)) {
-                creaProdottoComposto(req, resp, prodottoDAO, codice, nome.trim());
-                return;
-            }
-
-            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                    "Tipo prodotto non valido");
-
-        } catch (SQLException e) {
-            throw new ServletException("Errore durante la creazione del prodotto", e);
+        if (prodottoDAO.existsByCodice(codice)) {
+            sendError(resp, HttpServletResponse.SC_CONFLICT,
+                    "Esiste già un prodotto con questo codice");
+            return;
         }
+
+        String tipoPulito = tipo.trim().toUpperCase();
+
+        if ("SEMPLICE".equals(tipoPulito)) {
+            creaProdottoSemplice(req, resp, prodottoDAO, codice, nome.trim());
+            return;
+        }
+
+        if ("COMPOSTO".equals(tipoPulito)) {
+            creaProdottoCompostoFlat(req, resp, prodottoDAO, codice, nome.trim());
+            return;
+        }
+
+        sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                "Tipo prodotto non valido");
     }
 
     private void creaProdottoSemplice(HttpServletRequest req, HttpServletResponse resp,
@@ -116,8 +136,8 @@ public class CreaProdottoServlet extends BaseApiServlet {
         sendJson(resp, prodottoCreato);
     }
 
-    private void creaProdottoComposto(HttpServletRequest req, HttpServletResponse resp,
-                                      ProdottoDAO prodottoDAO, int codice, String nome)
+    private void creaProdottoCompostoFlat(HttpServletRequest req, HttpServletResponse resp,
+                                          ProdottoDAO prodottoDAO, int codice, String nome)
             throws SQLException, IOException {
 
         String descrizione = req.getParameter("descrizione");
@@ -212,7 +232,318 @@ public class CreaProdottoServlet extends BaseApiServlet {
         sendJson(resp, prodottoCreato);
     }
 
+    private void gestisciCreazioneCompostoDaJson(HttpServletRequest req, HttpServletResponse resp)
+            throws SQLException, IOException {
+
+        BuilderProdottoDto root = gson.fromJson(req.getReader(), BuilderProdottoDto.class);
+
+        if (root == null) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Body JSON mancante o non valido");
+            return;
+        }
+
+        if (!"COMPOSTO".equals(normalize(root.tipo))) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Il payload JSON deve rappresentare un prodotto composto");
+            return;
+        }
+
+        String errore = validaNodoBuilder(root, 1);
+        if (errore != null) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST, errore);
+            return;
+        }
+
+        ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
+
+        if (prodottoDAO.existsByCodice(root.codice)) {
+            sendError(resp, HttpServletResponse.SC_CONFLICT,
+                    "Esiste già un prodotto con questo codice");
+            return;
+        }
+
+        boolean autoCommitPrecedente = conn.getAutoCommit();
+
+        try {
+            conn.setAutoCommit(false);
+
+            int rootId = persistiNodoBuilder(root, null, prodottoDAO);
+
+            conn.commit();
+
+            sendJson(resp, Map.of(
+                    "ok", true,
+                    "id", rootId,
+                    "messaggio", "Prodotto composto salvato con successo"
+            ));
+
+        } catch (BusinessValidationException e) {
+            conn.rollback();
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+        } catch (Exception e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(autoCommitPrecedente);
+        }
+    }
+
+    private int persistiNodoBuilder(BuilderProdottoDto nodo, Integer padreId, ProdottoDAO prodottoDAO)
+            throws SQLException, BusinessValidationException {
+
+        String tipo = normalize(nodo.tipo);
+
+        if ("SEMPLICE".equals(tipo)) {
+            int sempliceId;
+            boolean prodottoNuovo = false;
+
+            if (nodo.id != null) {
+                Prodotto esistente = prodottoDAO.findById(nodo.id);
+
+                if (esistente == null) {
+                    throw new BusinessValidationException("Prodotto semplice referenziato non trovato");
+                }
+
+                if (!"SEMPLICE".equals(normalize(esistente.getTipo()))) {
+                    throw new BusinessValidationException("Il prodotto referenziato non è di tipo semplice");
+                }
+
+                if (esistente.getPadreId() != null) {
+                    throw new BusinessValidationException("Un prodotto semplice selezionato ha già un padre");
+                }
+
+                sempliceId = nodo.id;
+            } else {
+                if (prodottoDAO.existsByCodice(nodo.codice)) {
+                    throw new BusinessValidationException("Esiste già un prodotto con codice " + nodo.codice);
+                }
+
+                sempliceId = prodottoDAO.createProdottoSemplice(nodo.codice, nodo.nome);
+                prodottoNuovo = true;
+            }
+
+            if (padreId != null) {
+                prodottoDAO.setPadre(sempliceId, padreId);
+            }
+
+            if (nodo.skuList == null || nodo.skuList.isEmpty()) {
+                throw new BusinessValidationException(
+                        "Il prodotto semplice \"" + nodo.nome + "\" deve avere almeno una SKU"
+                );
+            }
+
+            if (prodottoNuovo) {
+                Set<Integer> skuGiaAssociate = new LinkedHashSet<>();
+
+                for (BuilderSkuDto skuDto : nodo.skuList) {
+                    Integer skuIdDaAssociare;
+
+                    if (skuDto.id != null) {
+                        SKUDAO skuDAO = new SKUDAO(conn);
+
+                        if (skuDAO.findById(skuDto.id) == null) {
+                            throw new BusinessValidationException("Una SKU selezionata non esiste");
+                        }
+
+                        skuIdDaAssociare = skuDto.id;
+                    } else {
+                        skuIdDaAssociare = creaNuovaSkuDaBuilder(skuDto);
+                    }
+
+                    if (skuGiaAssociate.add(skuIdDaAssociare)) {
+                        prodottoDAO.addSKUToProdotto(sempliceId, skuIdDaAssociare);
+                    }
+                }
+            }
+
+            return sempliceId;
+        }
+
+        if ("COMPOSTO".equals(tipo)) {
+            int compostoId;
+            boolean prodottoEsistente = nodo.id != null;
+
+            if (prodottoEsistente) {
+                Prodotto esistente = prodottoDAO.findById(nodo.id);
+
+                if (esistente == null) {
+                    throw new BusinessValidationException("Prodotto composto referenziato non trovato");
+                }
+
+                if (!"COMPOSTO".equals(normalize(esistente.getTipo()))) {
+                    throw new BusinessValidationException("Il prodotto referenziato non è di tipo composto");
+                }
+
+                if (esistente.getPadreId() != null) {
+                    throw new BusinessValidationException("Un prodotto composto selezionato ha già un padre");
+                }
+
+                int altezzaSottoalbero = prodottoDAO.getSubtreeHeight(nodo.id);
+                if (padreId != null && altezzaSottoalbero + 1 > MAX_PROFONDITA) {
+                    throw new BusinessValidationException("Profondità massima superata");
+                }
+
+                compostoId = nodo.id;
+            } else {
+                if (prodottoDAO.existsByCodice(nodo.codice)) {
+                    throw new BusinessValidationException("Esiste già un prodotto con codice " + nodo.codice);
+                }
+
+                compostoId = prodottoDAO.createProdottoComposto(
+                        nodo.codice,
+                        nodo.nome,
+                        nodo.descrizione.trim(),
+                        nodo.prezzoMin,
+                        nodo.prezzoMax
+                );
+            }
+
+            if (padreId != null) {
+                prodottoDAO.setPadre(compostoId, padreId);
+            }
+
+            // Se il prodotto composto era già esistente, i suoi figli esistono già:
+            // non devo ripersistirli.
+            if (!prodottoEsistente && nodo.figli != null) {
+                for (BuilderProdottoDto figlio : nodo.figli) {
+                    persistiNodoBuilder(figlio, compostoId, prodottoDAO);
+                }
+            }
+
+            return compostoId;
+        }
+
+        throw new BusinessValidationException("Tipo prodotto non valido");
+    }
+
+    private int creaNuovaSkuDaBuilder(BuilderSkuDto skuDto)
+            throws SQLException, BusinessValidationException {
+
+        SKUDAO skuDAO = new SKUDAO(conn);
+
+        if (skuDAO.existsByCodice(skuDto.codice)) {
+            throw new BusinessValidationException("Esiste già una SKU con codice " + skuDto.codice);
+        }
+
+        return skuDAO.createSKU(
+                skuDto.codice,
+                skuDto.nome,
+                null,
+                skuDto.descrizioneTecnica,
+                skuDto.prezzo
+        );
+    }
+
+    private String validaNodoBuilder(BuilderProdottoDto nodo, int profondita) {
+        if (nodo == null) {
+            return "Nodo prodotto mancante";
+        }
+
+        if (profondita > MAX_PROFONDITA) {
+            return "Profondità massima superata";
+        }
+
+        String tipo = normalize(nodo.tipo);
+
+        if (!"SEMPLICE".equals(tipo) && !"COMPOSTO".equals(tipo)) {
+            return "Tipo prodotto non valido";
+        }
+
+        if (isBlank(nodo.nome)) {
+            return "Il nome del prodotto è obbligatorio";
+        }
+
+        if (nodo.codice == null || nodo.codice < 0) {
+            return "Il codice del prodotto non è valido";
+        }
+
+        if ("SEMPLICE".equals(tipo)) {
+            if (nodo.skuList == null || nodo.skuList.isEmpty()) {
+                return "Ogni prodotto semplice deve avere almeno una SKU";
+            }
+
+            for (BuilderSkuDto sku : nodo.skuList) {
+                if (sku == null) {
+                    return "Una SKU non è valida";
+                }
+
+                if (sku.id == null) {
+                    if (sku.codice == null || sku.codice < 0) {
+                        return "Il codice di una nuova SKU non è valido";
+                    }
+
+                    if (isBlank(sku.nome) || isBlank(sku.descrizioneTecnica)) {
+                        return "Compila tutti i campi della nuova SKU";
+                    }
+
+                    if (sku.prezzo == null || sku.prezzo < 0) {
+                        return "Il prezzo di una nuova SKU non è valido";
+                    }
+                }
+            }
+        }
+
+        if ("COMPOSTO".equals(tipo)) {
+            if (isBlank(nodo.descrizione)) {
+                return "La descrizione del prodotto composto è obbligatoria";
+            }
+
+            if (nodo.prezzoMin == null || nodo.prezzoMin < 0 ||
+                    nodo.prezzoMax == null || nodo.prezzoMax < 0) {
+                return "La fascia di prezzo del prodotto composto non è valida";
+            }
+
+            if (nodo.prezzoMin > nodo.prezzoMax) {
+                return "Il prezzo minimo non può superare il massimo";
+            }
+
+            if (nodo.figli == null || nodo.figli.isEmpty()) {
+                return "Ogni prodotto composto deve avere almeno un sottoprodotto";
+            }
+
+            for (BuilderProdottoDto figlio : nodo.figli) {
+                String errore = validaNodoBuilder(figlio, profondita + 1);
+                if (errore != null) {
+                    return errore;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private String normalize(String value) {
+        return value == null ? null : value.trim().toUpperCase();
+    }
+
     private boolean isBlank(String valore) {
         return valore == null || valore.isBlank();
+    }
+
+    private static class BuilderProdottoDto {
+        Integer id;
+        Integer codice;
+        String nome;
+        String tipo;
+        String descrizione;
+        Double prezzoMin;
+        Double prezzoMax;
+        List<BuilderProdottoDto> figli;
+        List<BuilderSkuDto> skuList;
+    }
+
+    private static class BuilderSkuDto {
+        Integer id;
+        Integer codice;
+        String nome;
+        String descrizioneTecnica;
+        Double prezzo;
+    }
+
+    private static class BusinessValidationException extends Exception {
+        private BusinessValidationException(String message) {
+            super(message);
+        }
     }
 }

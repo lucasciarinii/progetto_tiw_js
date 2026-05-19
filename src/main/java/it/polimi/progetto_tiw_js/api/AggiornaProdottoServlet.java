@@ -53,7 +53,11 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                 return;
             }
 
-            String campoPulito = campo.trim();
+            String tipoProdotto = prodotto.getTipo() == null
+                    ? ""
+                    : prodotto.getTipo().trim().toUpperCase();
+
+            String campoPulito = campo.trim().toLowerCase();
 
             switch (campoPulito) {
                 case "nome" -> {
@@ -69,7 +73,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                 }
 
                 case "descrizione" -> {
-                    if (!"COMPOSTO".equals(prodotto.getTipo())) {
+                    if (!"COMPOSTO".equals(tipoProdotto)) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "La descrizione è modificabile solo per i prodotti composti");
                         return;
@@ -86,8 +90,8 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                     prodottoDAO.updateDescrizione(id, descrizione);
                 }
 
-                case "prezzoMin" -> {
-                    if (!"COMPOSTO".equals(prodotto.getTipo())) {
+                case "prezzomin" -> {
+                    if (!"COMPOSTO".equals(tipoProdotto)) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il prezzo minimo è modificabile solo per i prodotti composti");
                         return;
@@ -117,8 +121,8 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                     prodottoDAO.updatePrezzoMin(id, prezzoMin);
                 }
 
-                case "prezzoMax" -> {
-                    if (!"COMPOSTO".equals(prodotto.getTipo())) {
+                case "prezzomax" -> {
+                    if (!"COMPOSTO".equals(tipoProdotto)) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il prezzo massimo è modificabile solo per i prodotti composti");
                         return;
@@ -156,10 +160,16 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
             }
 
             Prodotto prodottoAggiornato;
-            if ("SEMPLICE".equals(prodotto.getTipo())) {
+            if ("SEMPLICE".equals(tipoProdotto)) {
                 prodottoAggiornato = prodottoDAO.findByIdConSKU(id);
             } else {
                 prodottoAggiornato = prodottoDAO.findByIdConDiscendenti(id);
+            }
+
+            if (prodottoAggiornato == null) {
+                sendError(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                        "Impossibile ricaricare il prodotto aggiornato");
+                return;
             }
 
             sendJson(resp, prodottoAggiornato);

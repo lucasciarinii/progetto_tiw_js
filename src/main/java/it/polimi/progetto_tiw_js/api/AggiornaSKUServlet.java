@@ -10,6 +10,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.sql.SQLException;
 
+/**
+ * Aggiorna un singolo campo di una SKU tramite inline editing
+ * e restituisce il dettaglio aggiornato in JSON.
+ */
 @WebServlet("/apifornitoreskuaggiorna")
 public class AggiornaSKUServlet extends BaseApiServlet {
 
@@ -21,6 +25,8 @@ public class AggiornaSKUServlet extends BaseApiServlet {
 
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
+
+        req.setCharacterEncoding("UTF-8");
 
         String idParam = req.getParameter("id");
         String campo = req.getParameter("campo");

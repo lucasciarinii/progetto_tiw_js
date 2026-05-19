@@ -16,6 +16,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Esegue la ricerca lato fornitore su prodotti e SKU.
+ *
+ * Il frontend si aspetta un JSON del tipo:
+ * {
+ *   "keyword": "...",
+ *   "prodotti": [...],
+ *   "sku": [...]
+ * }
+ */
 @WebServlet("/apifornitorericerca")
 public class RicercaProdottiServlet extends BaseApiServlet {
 
@@ -25,6 +35,7 @@ public class RicercaProdottiServlet extends BaseApiServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
+        // accesso consentito solo al fornitore autenticato
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
@@ -36,15 +47,18 @@ public class RicercaProdottiServlet extends BaseApiServlet {
             return;
         }
 
-        String keywordPulita = "%" + keyword.trim().toLowerCase() + "%";
+        String keywordPulita = keyword.trim();
 
         try {
             ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
             SKUDAO skuDAO = new SKUDAO(conn);
 
+            // prima recupero i prodotti base che matchano la keyword
             List<Prodotto> prodottiBase = prodottoDAO.searchByKeyword(keywordPulita);
             List<Prodotto> prodottiCompleti = new ArrayList<>();
 
+            // poi per ogni prodotto carico il dettaglio completo
+            // così il pannello di destra può mostrare tutto senza ambiguità
             for (Prodotto prodottoBase : prodottiBase) {
                 if (prodottoBase == null) {
                     continue;
@@ -65,10 +79,12 @@ public class RicercaProdottiServlet extends BaseApiServlet {
                 }
             }
 
+            // stessa logica anche per le SKU: la keyword viene passata pulita,
+            // eventuali wildcard le gestisce il DAO
             List<SKU> risultatiSku = skuDAO.searchByKeyword(keywordPulita);
 
             Map<String, Object> risultato = new HashMap<>();
-            risultato.put("keyword", keyword.trim());
+            risultato.put("keyword", keywordPulita);
             risultato.put("prodotti", prodottiCompleti);
             risultato.put("sku", risultatiSku);
 

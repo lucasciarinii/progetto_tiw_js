@@ -19,7 +19,6 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
@@ -78,6 +77,12 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
             return;
         }
 
+        if (prodottoId <= 0 || skuId <= 0) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Parametri non validi");
+            return;
+        }
+
         Prodotto prodotto = prodottoDAO.findByIdConSKU(prodottoId);
 
         if (prodotto == null) {
@@ -116,6 +121,12 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
         prodottoDAO.removeSKUDaProdotto(prodottoId, skuId);
 
         Prodotto prodottoAggiornato = prodottoDAO.findByIdConSKU(prodottoId);
+        if (prodottoAggiornato == null) {
+            sendError(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Impossibile ricaricare il prodotto aggiornato");
+            return;
+        }
+
         sendJson(resp, prodottoAggiornato);
     }
 
@@ -147,6 +158,12 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
             return;
         }
 
+        if (figlioId <= 0 || (padreIdRichiesto != null && padreIdRichiesto <= 0)) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Parametri non validi");
+            return;
+        }
+
         Prodotto figlio = prodottoDAO.findById(figlioId);
 
         if (figlio == null) {
@@ -169,12 +186,26 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
             return;
         }
 
+        Prodotto padre = prodottoDAO.findById(padreIdReale);
+
+        if (padre == null) {
+            sendError(resp, HttpServletResponse.SC_NOT_FOUND,
+                    "Prodotto padre non trovato");
+            return;
+        }
+
+        if (!"COMPOSTO".equalsIgnoreCase(padre.getTipo())) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Il padre deve essere un prodotto composto");
+            return;
+        }
+
         prodottoDAO.removePadre(figlioId);
 
         Prodotto padreAggiornato = prodottoDAO.findByIdConDiscendenti(padreIdReale);
         if (padreAggiornato == null) {
-            sendError(resp, HttpServletResponse.SC_NOT_FOUND,
-                    "Prodotto padre non trovato");
+            sendError(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Impossibile ricaricare il prodotto padre aggiornato");
             return;
         }
 

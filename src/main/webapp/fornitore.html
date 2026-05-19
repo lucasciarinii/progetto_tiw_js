@@ -44,14 +44,10 @@
         <div class="page-wrapper">
             <h1 class="page-title">Home Fornitore</h1>
 
-            <!-- Messaggi lato client: errori / successi delle fetch -->
             <div id="message-box-home" class="alert" hidden></div>
 
             <div class="two-columns">
-                <!-- Colonna principale -->
                 <section class="stack-lg">
-
-                    <!-- FORM 1: Nuova SKU -->
                     <div class="card">
                         <h2 class="card-title">Nuova SKU</h2>
 
@@ -103,7 +99,6 @@
                         </form>
                     </div>
 
-                    <!-- FORM 2: Nuovo prodotto semplice -->
                     <div class="card">
                         <h2 class="card-title">Nuovo prodotto semplice</h2>
 
@@ -138,7 +133,6 @@
                         </form>
                     </div>
 
-                    <!-- FORM 3: Nuovo prodotto composto -->
                     <div class="card">
                         <h2 class="card-title">Nuovo prodotto composto</h2>
 
@@ -202,14 +196,13 @@
                     </div>
                 </section>
 
-                <!-- Colonna laterale: dettaglio -->
                 <aside class="side-panel">
                     <div class="card">
                         <h2 class="card-title">Dettaglio</h2>
 
                         <div id="dettaglio-content">
                             <p class="muted">
-                                Dopo una creazione o una ricerca, qui comparirà il dettaglio dell'oggetto selezionato.
+                                Dopo una creazione o una selezione nella home, qui comparirà il dettaglio dell'oggetto.
                             </p>
                         </div>
                     </div>
@@ -226,12 +219,6 @@
     <header class="navbar">
         <div class="navbar-brand">Configuratore</div>
 
-        <ul class="navbar-links">
-            <li>
-                <a href="#" id="link-home-fornitore">Home</a>
-            </li>
-        </ul>
-
         <div class="navbar-user">
             Ciao
             <span id="utente-nome-ricerca">Mario</span>
@@ -239,6 +226,9 @@
         </div>
 
         <ul class="navbar-links">
+            <li>
+                <a href="#" id="link-home-fornitore">Home</a>
+            </li>
             <li>
                 <button type="button" id="btn-logout-ricerca" class="btn btn-danger btn-sm">Logout</button>
             </li>
@@ -251,37 +241,38 @@
 
             <div id="message-box-ricerca" class="alert" hidden></div>
 
-            <div class="card">
-                <div class="form-group ricerca-toolbar">
-                    <label for="input-ricerca">Cerca per nome o codice</label>
+            <div class="card ricerca-toolbar">
+                <div class="form-group">
+                    <label for="input-ricerca">Cerca prodotto o SKU</label>
                     <input id="input-ricerca"
                            type="text"
-                           placeholder="Inserisci una parola chiave">
+                           placeholder="Inserisci nome, descrizione o codice">
+                </div>
+
+                <div class="ricerca-actions">
                     <button type="button" id="btn-cerca" class="btn btn-primary">Cerca</button>
                 </div>
             </div>
 
-            <div class="two-columns">
-                <!-- Risultati -->
-                <section class="stack-lg">
-                    <div class="card">
+            <div class="ricerca-grid">
+                <section>
+                    <div class="card result-card">
                         <h2 class="card-title">Risultati</h2>
 
                         <div id="ricerca-risultati">
-                            <p class="muted">
+                            <p class="empty-box">
                                 Inserisci una parola chiave per cercare prodotti e SKU.
                             </p>
                         </div>
                     </div>
                 </section>
 
-                <!-- Dettaglio risultato -->
-                <aside class="side-panel">
+                <aside>
                     <div class="card">
                         <h2 class="card-title">Dettaglio</h2>
 
                         <div id="ricerca-dettaglio">
-                            <p class="muted">
+                            <p class="detail-empty-box">
                                 Seleziona un risultato per vedere i dettagli.
                             </p>
                         </div>
@@ -297,7 +288,6 @@
 <script src="js/prodotto.js"></script>
 <script src="js/ricerca.js"></script>
 <script src="js/main.js"></script>
-
 
 </body>
 </html>

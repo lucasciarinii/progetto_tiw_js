@@ -73,7 +73,10 @@ a:hover { text-decoration: underline; }
     font-size: 0.875rem;
     color: var(--text-muted);
 }
-.navbar-links a:hover { color: var(--text); text-decoration: none; }
+.navbar-links a:hover {
+    color: var(--text);
+    text-decoration: none;
+}
 
 .navbar-user {
     font-size: 0.875rem;
@@ -144,7 +147,10 @@ a:hover { text-decoration: underline; }
     border-color: var(--accent);
 }
 
-.form-group textarea { resize: vertical; min-height: 80px; }
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
 
 .form-hint {
     font-size: 0.8125rem;
@@ -172,28 +178,43 @@ a:hover { text-decoration: underline; }
     color: #fff;
     border-color: var(--accent);
 }
-.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); text-decoration: none; }
+.btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    text-decoration: none;
+}
 
 .btn-outline {
     background: transparent;
     color: var(--accent);
     border-color: var(--accent);
 }
-.btn-outline:hover { background: var(--accent); color: #fff; text-decoration: none; }
+.btn-outline:hover {
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+}
 
 .btn-ghost {
     background: transparent;
     color: var(--text-muted);
     border-color: var(--border);
 }
-.btn-ghost:hover { color: var(--text); border-color: var(--text-muted); text-decoration: none; }
+.btn-ghost:hover {
+    color: var(--text);
+    border-color: var(--text-muted);
+    text-decoration: none;
+}
 
 .btn-danger {
     background: transparent;
     color: var(--error-text);
     border-color: var(--error-border);
 }
-.btn-danger:hover { background: var(--error-bg); text-decoration: none; }
+.btn-danger:hover {
+    background: var(--error-bg);
+    text-decoration: none;
+}
 
 .btn-sm { padding: 0.3rem 0.75rem; font-size: 0.8125rem; }
 .btn-full { width: 100%; }
@@ -212,7 +233,11 @@ a:hover { text-decoration: underline; }
 /* ---- TABELLA ---- */
 .table-wrapper { overflow-x: auto; }
 
-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
 
 thead th {
     text-align: left;
@@ -242,7 +267,10 @@ tbody tr:hover { background: var(--bg); }
     margin-top: 1.25rem;
 }
 
-.pagination span { font-size: 0.875rem; color: var(--text-muted); }
+.pagination span {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
 
 /* ---- LOGIN PAGE ---- */
 .login-body {
@@ -297,6 +325,15 @@ tbody tr:hover { background: var(--bg); }
     align-items: start;
 }
 
+/* layout specifico ricerca: lista a sinistra, dettaglio a destra */
+.ricerca-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
+    gap: 1.25rem;
+    align-items: start;
+    margin-top: 1rem;
+}
+
 .stack-lg {
     display: grid;
     gap: 1rem;
@@ -339,7 +376,8 @@ tbody tr:hover { background: var(--bg); }
         gap: 0.75rem;
     }
 
-    .two-columns {
+    .two-columns,
+    .ricerca-grid {
         grid-template-columns: 1fr;
     }
 
@@ -450,8 +488,178 @@ tbody tr:hover { background: var(--bg); }
     text-decoration: underline;
 }
 
+/* barra della ricerca */
+.ricerca-toolbar {
+    margin-bottom: 0;
+}
+
+.ricerca-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+/* messaggi vuoti della ricerca */
+.empty-box,
+.detail-empty-box {
+    color: var(--text-muted);
+}
+
+.empty-box {
+    padding: 0.25rem 0;
+}
+
+.detail-empty-box {
+    padding: 0.25rem 0;
+}
+
+/* card risultati */
+.result-card .card-title {
+    margin-bottom: 0.75rem;
+}
+
+/* lista risultati ricerca */
+.result-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.result-item + .result-item {
+    border-top: 1px solid var(--border);
+}
+
+.result-link {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 0.15rem;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+.result-link:hover {
+    text-decoration: none;
+    background: var(--bg);
+}
+
+.result-link.is-active {
+    background: #edf3fb;
+    border-radius: var(--radius);
+}
+
+.result-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.result-main > span:first-child {
+    font-weight: 500;
+    color: var(--text);
+}
+
+.result-code {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+}
+
+.result-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* dettaglio ricerca */
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.detail-title {
+    margin-bottom: 0;
+}
+
+.detail-code,
+.detail-code-large {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+.detail-code {
+    margin-top: 0.2rem;
+    margin-bottom: 0;
+}
+
+.detail-code-large {
+    margin-top: 0.2rem;
+    margin-bottom: 0;
+}
+
+.detail-description {
+    margin-bottom: 0.75rem;
+}
+
+.detail-price {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.detail-meta {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.detail-image-box {
+    margin-top: 1rem;
+}
+
+.detail-image {
+    display: block;
+    max-width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+/* titoli interni nelle sezioni dettaglio */
+.section-subtitle,
+.tree-section-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.section-subtitle {
+    margin-bottom: 0.5rem;
+}
+
+.tree-section {
+    margin-top: 1.25rem;
+}
+
+.tree-section-title {
+    margin-bottom: 0.75rem;
+}
+
 /* albero prodotto - lato fornitore */
 .tree-node,
+.tree-nodo,
 .tree-nodo-composto,
 .tree-nodo-semplice {
     border: 1px solid var(--border);
@@ -460,6 +668,7 @@ tbody tr:hover { background: var(--bg); }
 }
 
 .tree-node + .tree-node,
+.tree-nodo + .tree-nodo,
 .tree-nodo-composto + .tree-nodo-composto,
 .tree-nodo-semplice + .tree-nodo-semplice {
     margin-top: 0.75rem;
@@ -483,6 +692,7 @@ tbody tr:hover { background: var(--bg); }
     display: grid;
     gap: 0.75rem;
     padding: 0 1rem 1rem 1rem;
+    margin-top: 0.75rem;
 }
 
 .tree-node-children > div,

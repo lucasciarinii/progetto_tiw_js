@@ -1,6 +1,5 @@
 package it.polimi.progetto_tiw_js.api;
 
-import it.polimi.progetto_tiw_js.api.BaseApiServlet;
 import it.polimi.progetto_tiw_js.beans.SKU;
 import it.polimi.progetto_tiw_js.dao.SKUDAO;
 import jakarta.servlet.ServletException;

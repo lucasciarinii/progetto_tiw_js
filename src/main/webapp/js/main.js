@@ -1,5 +1,3 @@
-console.log('=== MAIN JS CARICATO DAVVERO ===');
-alert('MAIN JS CARICATO DAVVERO');
 window.appFornitore = {
     getUtente() {
         return null;
@@ -66,8 +64,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     inizializzaEventi();
-    await controllaSessione();
-    mostraSezione('home');
+
+    const sessioneValida = await controllaSessione();
+    if (!sessioneValida) {
+        return;
+    }
 
     window.appFornitore = {
         getUtente() {
@@ -95,6 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    mostraSezione('home');
     inizializzaModuliFigli();
 
     function inizializzaEventi() {
@@ -137,19 +139,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (!resp.ok || !data || !data.loggedIn) {
                 window.location.href = 'index.html';
-                return;
+                return false;
             }
 
             if (!data.utente) {
                 mostraMessaggioHome('Sessione valida ma dati utente mancanti.', 'error');
-                return;
+                return false;
             }
 
             statoPagina.utente = data.utente;
             aggiornaUtenteNavbar(data.utente);
+            return true;
         } catch (err) {
             console.error('Errore durante il controllo sessione:', err);
             window.location.href = 'index.html';
+            return false;
         }
     }
 
@@ -224,7 +228,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function mostraMessaggio(box, testo, tipo) {
-        if (!box) return;
+        if (!box) {
+            return;
+        }
 
         box.hidden = false;
         box.textContent = testo;
@@ -243,7 +249,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function nascondiMessaggio(box) {
-        if (!box) return;
+        if (!box) {
+            return;
+        }
 
         box.hidden = true;
         box.textContent = '';

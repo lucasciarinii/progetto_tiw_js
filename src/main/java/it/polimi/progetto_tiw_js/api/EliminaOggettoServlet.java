@@ -11,6 +11,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 
 @WebServlet("/apifornitoreoggettoelimina")
 public class EliminaOggettoServlet extends BaseApiServlet {
@@ -46,6 +48,18 @@ public class EliminaOggettoServlet extends BaseApiServlet {
         } catch (NumberFormatException e) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametro id non valido");
+            return;
+        }
+
+        if (id <= 0) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Parametro id non valido");
+            return;
+        }
+
+        if (returnProdottoId != null && returnProdottoId <= 0) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Parametro returnProdottoId non valido");
             return;
         }
 
@@ -87,7 +101,20 @@ public class EliminaOggettoServlet extends BaseApiServlet {
         }
 
         skuDAO.deleteSKU(skuId);
-        sendJson(resp, createOkResponse());
+
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("ok", true);
+
+        // se il frontend ci dice da quale prodotto semplice siamo partiti,
+        // proviamo a rimandargli il dettaglio aggiornato già pronto
+        if (returnProdottoId != null) {
+            Prodotto prodottoAggiornato = prodottoDAO.findByIdConSKU(returnProdottoId);
+            if (prodottoAggiornato != null) {
+                responseBody.put("prodottoAggiornato", prodottoAggiornato);
+            }
+        }
+
+        sendJson(resp, responseBody);
     }
 
     private void eliminaProdottoSemplice(HttpServletResponse resp, ProdottoDAO prodottoDAO, int id)
