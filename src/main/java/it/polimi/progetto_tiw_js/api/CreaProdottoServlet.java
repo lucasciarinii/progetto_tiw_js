@@ -23,27 +23,39 @@ import java.util.Set;
 public class CreaProdottoServlet extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
-    private static final int MAX_PROFONDITA = 3;
 
+    // Profondità massima ammessa dalla traccia.
+    // Convenzione usata nel progetto:
+    // livello 1 = radice del composto che stiamo creando.
+    private static final int MAX_PROFONDITA = 4;
+
+    // Gson ci serve per leggere il payload JSON inviato dal builder JS.
     private final Gson gson = new Gson();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        if (!isLogged(req, resp)) return;
-        if (!hasRole(req, resp, "FORNITORE")) return;
+        // Controllo login.
+        if (!isLogged(req, resp)) {
+            return;
+        }
+
+        // Solo il fornitore può creare prodotti.
+        if (!hasRole(req, resp, "FORNITORE")) {
+            return;
+        }
 
         try {
             String contentType = req.getContentType();
 
-            // Se arriva JSON, allora siamo nel flusso nuovo del builder composto.
+            // Se arriva JSON, siamo nel flusso nuovo del builder dei composti.
             if (contentType != null && contentType.toLowerCase().contains("application/json")) {
                 gestisciCreazioneCompostoDaJson(req, resp);
                 return;
             }
 
-            // Altrimenti teniamo il comportamento classico a parametri.
+            // Altrimenti teniamo il comportamento classico del form tradizionale.
             gestisciCreazioneDaParametri(req, resp);
 
         } catch (SQLException e) {
@@ -51,6 +63,11 @@ public class CreaProdottoServlet extends BaseApiServlet {
         }
     }
 
+    /**
+     * Flusso classico:
+     * - prodotto semplice creato via form tradizionale
+     * - prodotto composto flat creato via form tradizionale
+     */
     private void gestisciCreazioneDaParametri(HttpServletRequest req, HttpServletResponse resp)
             throws SQLException, IOException {
 
@@ -86,7 +103,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return;
         }
 
-        String tipoPulito = tipo.trim().toUpperCase();
+        String tipoPulito = normalize(tipo);
 
         if ("SEMPLICE".equals(tipoPulito)) {
             creaProdottoSemplice(req, resp, prodottoDAO, codice, nome.trim());
@@ -102,6 +119,10 @@ public class CreaProdottoServlet extends BaseApiServlet {
                 "Tipo prodotto non valido");
     }
 
+    /**
+     * Creazione tradizionale di un prodotto semplice.
+     * In questo caso il prodotto nasce già persistito e poi gli associamo le SKU.
+     */
     private void creaProdottoSemplice(HttpServletRequest req, HttpServletResponse resp,
                                       ProdottoDAO prodottoDAO, int codice, String nome)
             throws SQLException, IOException {
@@ -136,6 +157,10 @@ public class CreaProdottoServlet extends BaseApiServlet {
         sendJson(resp, prodottoCreato);
     }
 
+    /**
+     * Creazione tradizionale di un composto "flat":
+     * il composto è nuovo e i figli selezionati sono prodotti già esistenti senza padre.
+     */
     private void creaProdottoCompostoFlat(HttpServletRequest req, HttpServletResponse resp,
                                           ProdottoDAO prodottoDAO, int codice, String nome)
             throws SQLException, IOException {
@@ -193,6 +218,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             }
         }
 
+        // Validiamo i figli prima di creare il nuovo composto.
         for (Integer figlioId : figlioIds) {
             Prodotto figlio = prodottoDAO.findById(figlioId);
 
@@ -232,6 +258,17 @@ public class CreaProdottoServlet extends BaseApiServlet {
         sendJson(resp, prodottoCreato);
     }
 
+    /**
+     * Flusso nuovo del builder JS.
+     * Qui riceviamo un albero JSON che può contenere:
+     * - nodi nuovi da creare
+     * - nodi esistenti da collegare
+     *
+     * Regola chiave:
+     * se un nodo ha id != null, per noi è un riferimento a un prodotto già esistente.
+     * In quel caso i figli presenti nel JSON servono solo al frontend per mostrare
+     * l'albero completo nel builder, ma non devono essere ripersistiti.
+     */
     private void gestisciCreazioneCompostoDaJson(HttpServletRequest req, HttpServletResponse resp)
             throws SQLException, IOException {
 
@@ -257,6 +294,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
 
         ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
 
+        // La radice del builder è sempre un nuovo composto.
         if (prodottoDAO.existsByCodice(root.codice)) {
             sendError(resp, HttpServletResponse.SC_CONFLICT,
                     "Esiste già un prodotto con questo codice");
@@ -272,11 +310,10 @@ public class CreaProdottoServlet extends BaseApiServlet {
 
             conn.commit();
 
-            sendJson(resp, Map.of(
-                    "ok", true,
-                    "id", rootId,
-                    "messaggio", "Prodotto composto salvato con successo"
-            ));
+            // Restituiamo il prodotto completo appena salvato, così il frontend
+            // può ricaricare subito il dettaglio corretto.
+            Prodotto prodottoCreato = prodottoDAO.findByIdConDiscendenti(rootId);
+            sendJson(resp, prodottoCreato);
 
         } catch (BusinessValidationException e) {
             conn.rollback();
@@ -289,138 +326,181 @@ public class CreaProdottoServlet extends BaseApiServlet {
         }
     }
 
+    /**
+     * Persistenza ricorsiva dell'albero del builder.
+     *
+     * Casi possibili:
+     * 1) nodo nuovo (id == null): viene creato a DB
+     * 2) nodo esistente (id != null): viene solo collegato al nuovo padre
+     *
+     * Nota importante:
+     * per i nodi esistenti NON si scende ricorsivamente nei figli,
+     * perché quel sottoalbero esiste già nel database.
+     */
     private int persistiNodoBuilder(BuilderProdottoDto nodo, Integer padreId, ProdottoDAO prodottoDAO)
             throws SQLException, BusinessValidationException {
 
         String tipo = normalize(nodo.tipo);
 
         if ("SEMPLICE".equals(tipo)) {
-            int sempliceId;
-            boolean prodottoNuovo = false;
-
-            if (nodo.id != null) {
-                Prodotto esistente = prodottoDAO.findById(nodo.id);
-
-                if (esistente == null) {
-                    throw new BusinessValidationException("Prodotto semplice referenziato non trovato");
-                }
-
-                if (!"SEMPLICE".equals(normalize(esistente.getTipo()))) {
-                    throw new BusinessValidationException("Il prodotto referenziato non è di tipo semplice");
-                }
-
-                if (esistente.getPadreId() != null) {
-                    throw new BusinessValidationException("Un prodotto semplice selezionato ha già un padre");
-                }
-
-                sempliceId = nodo.id;
-            } else {
-                if (prodottoDAO.existsByCodice(nodo.codice)) {
-                    throw new BusinessValidationException("Esiste già un prodotto con codice " + nodo.codice);
-                }
-
-                sempliceId = prodottoDAO.createProdottoSemplice(nodo.codice, nodo.nome);
-                prodottoNuovo = true;
-            }
-
-            if (padreId != null) {
-                prodottoDAO.setPadre(sempliceId, padreId);
-            }
-
-            if (nodo.skuList == null || nodo.skuList.isEmpty()) {
-                throw new BusinessValidationException(
-                        "Il prodotto semplice \"" + nodo.nome + "\" deve avere almeno una SKU"
-                );
-            }
-
-            if (prodottoNuovo) {
-                Set<Integer> skuGiaAssociate = new LinkedHashSet<>();
-
-                for (BuilderSkuDto skuDto : nodo.skuList) {
-                    Integer skuIdDaAssociare;
-
-                    if (skuDto.id != null) {
-                        SKUDAO skuDAO = new SKUDAO(conn);
-
-                        if (skuDAO.findById(skuDto.id) == null) {
-                            throw new BusinessValidationException("Una SKU selezionata non esiste");
-                        }
-
-                        skuIdDaAssociare = skuDto.id;
-                    } else {
-                        skuIdDaAssociare = creaNuovaSkuDaBuilder(skuDto);
-                    }
-
-                    if (skuGiaAssociate.add(skuIdDaAssociare)) {
-                        prodottoDAO.addSKUToProdotto(sempliceId, skuIdDaAssociare);
-                    }
-                }
-            }
-
-            return sempliceId;
+            return persistiNodoSemplice(nodo, padreId, prodottoDAO);
         }
 
         if ("COMPOSTO".equals(tipo)) {
-            int compostoId;
-            boolean prodottoEsistente = nodo.id != null;
-
-            if (prodottoEsistente) {
-                Prodotto esistente = prodottoDAO.findById(nodo.id);
-
-                if (esistente == null) {
-                    throw new BusinessValidationException("Prodotto composto referenziato non trovato");
-                }
-
-                if (!"COMPOSTO".equals(normalize(esistente.getTipo()))) {
-                    throw new BusinessValidationException("Il prodotto referenziato non è di tipo composto");
-                }
-
-                if (esistente.getPadreId() != null) {
-                    throw new BusinessValidationException("Un prodotto composto selezionato ha già un padre");
-                }
-
-                int altezzaSottoalbero = prodottoDAO.getSubtreeHeight(nodo.id);
-                if (padreId != null && altezzaSottoalbero + 1 > MAX_PROFONDITA) {
-                    throw new BusinessValidationException("Profondità massima superata");
-                }
-
-                compostoId = nodo.id;
-            } else {
-                if (prodottoDAO.existsByCodice(nodo.codice)) {
-                    throw new BusinessValidationException("Esiste già un prodotto con codice " + nodo.codice);
-                }
-
-                compostoId = prodottoDAO.createProdottoComposto(
-                        nodo.codice,
-                        nodo.nome,
-                        nodo.descrizione.trim(),
-                        nodo.prezzoMin,
-                        nodo.prezzoMax
-                );
-            }
-
-            if (padreId != null) {
-                prodottoDAO.setPadre(compostoId, padreId);
-            }
-
-            // Se il prodotto composto era già esistente, i suoi figli esistono già:
-            // non devo ripersistirli.
-            if (!prodottoEsistente && nodo.figli != null) {
-                for (BuilderProdottoDto figlio : nodo.figli) {
-                    persistiNodoBuilder(figlio, compostoId, prodottoDAO);
-                }
-            }
-
-            return compostoId;
+            return persistiNodoComposto(nodo, padreId, prodottoDAO);
         }
 
         throw new BusinessValidationException("Tipo prodotto non valido");
     }
 
-    private int creaNuovaSkuDaBuilder(BuilderSkuDto skuDto)
+    /**
+     * Gestione del nodo semplice del builder.
+     */
+    private int persistiNodoSemplice(BuilderProdottoDto nodo, Integer padreId, ProdottoDAO prodottoDAO)
             throws SQLException, BusinessValidationException {
 
-        SKUDAO skuDAO = new SKUDAO(conn);
+        int sempliceId;
+        boolean prodottoNuovo = false;
+
+        if (nodo.id != null) {
+            // Caso prodotto semplice già esistente: lo referenziamo e basta.
+            Prodotto esistente = prodottoDAO.findById(nodo.id);
+
+            if (esistente == null) {
+                throw new BusinessValidationException("Prodotto semplice referenziato non trovato");
+            }
+
+            if (!"SEMPLICE".equals(normalize(esistente.getTipo()))) {
+                throw new BusinessValidationException("Il prodotto referenziato non è di tipo semplice");
+            }
+
+            if (esistente.getPadreId() != null) {
+                throw new BusinessValidationException("Un prodotto semplice selezionato ha già un padre");
+            }
+
+            sempliceId = nodo.id;
+        } else {
+            // Caso prodotto semplice nuovo creato nel builder.
+            if (prodottoDAO.existsByCodice(nodo.codice)) {
+                throw new BusinessValidationException("Esiste già un prodotto con codice " + nodo.codice);
+            }
+
+            sempliceId = prodottoDAO.createProdottoSemplice(nodo.codice, nodo.nome);
+            prodottoNuovo = true;
+        }
+
+        // Se c'è un padre, colleghiamo il semplice al composto corrente.
+        if (padreId != null) {
+            prodottoDAO.setPadre(sempliceId, padreId);
+        }
+
+        // Ogni semplice deve avere almeno una SKU nel payload.
+        // Anche per gli esistenti pretendiamo che ci sia, perché il builder
+        // ci manda comunque la situazione visualizzata.
+        if (nodo.skuList == null || nodo.skuList.isEmpty()) {
+            throw new BusinessValidationException(
+                    "Il prodotto semplice \"" + nodo.nome + "\" deve avere almeno una SKU"
+            );
+        }
+
+        // Solo per i semplici nuovi associamo davvero le SKU.
+        // Se il semplice è già esistente, le sue SKU sono già persistite a database:
+        // il payload le contiene solo per mostrare il nodo nel builder.
+        if (prodottoNuovo) {
+            Set<Integer> skuGiaAssociate = new LinkedHashSet<>();
+            SKUDAO skuDAO = new SKUDAO(conn);
+
+            for (BuilderSkuDto skuDto : nodo.skuList) {
+                Integer skuIdDaAssociare;
+
+                if (skuDto.id != null) {
+                    if (skuDAO.findById(skuDto.id) == null) {
+                        throw new BusinessValidationException("Una SKU selezionata non esiste");
+                    }
+                    skuIdDaAssociare = skuDto.id;
+                } else {
+                    skuIdDaAssociare = creaNuovaSkuDaBuilder(skuDto, skuDAO);
+                }
+
+                // Evitiamo doppie associazioni della stessa SKU allo stesso semplice.
+                if (skuGiaAssociate.add(skuIdDaAssociare)) {
+                    prodottoDAO.addSKUToProdotto(sempliceId, skuIdDaAssociare);
+                }
+            }
+        }
+
+        return sempliceId;
+    }
+
+    /**
+     * Gestione del nodo composto del builder.
+     */
+    private int persistiNodoComposto(BuilderProdottoDto nodo, Integer padreId, ProdottoDAO prodottoDAO)
+            throws SQLException, BusinessValidationException {
+
+        int compostoId;
+        boolean prodottoEsistente = nodo.id != null;
+
+        if (prodottoEsistente) {
+            // Caso composto già presente nel DB.
+            Prodotto esistente = prodottoDAO.findById(nodo.id);
+
+            if (esistente == null) {
+                throw new BusinessValidationException("Prodotto composto referenziato non trovato");
+            }
+
+            if (!"COMPOSTO".equals(normalize(esistente.getTipo()))) {
+                throw new BusinessValidationException("Il prodotto referenziato non è di tipo composto");
+            }
+
+            if (esistente.getPadreId() != null) {
+                throw new BusinessValidationException("Un prodotto composto selezionato ha già un padre");
+            }
+
+            int altezzaSottoalbero = prodottoDAO.getSubtreeHeight(nodo.id);
+            if (padreId != null && altezzaSottoalbero + 1 > MAX_PROFONDITA) {
+                throw new BusinessValidationException("Profondità massima superata");
+            }
+
+            compostoId = nodo.id;
+        } else {
+            // Caso composto nuovo creato nel builder.
+            if (prodottoDAO.existsByCodice(nodo.codice)) {
+                throw new BusinessValidationException("Esiste già un prodotto con codice " + nodo.codice);
+            }
+
+            compostoId = prodottoDAO.createProdottoComposto(
+                    nodo.codice,
+                    nodo.nome,
+                    nodo.descrizione.trim(),
+                    nodo.prezzoMin,
+                    nodo.prezzoMax
+            );
+        }
+
+        // Colleghiamo il nodo al padre corrente, se esiste.
+        if (padreId != null) {
+            prodottoDAO.setPadre(compostoId, padreId);
+        }
+
+        // Punto chiave della nuova logica:
+        // se il composto è già esistente, NON persistiamo ricorsivamente i figli.
+        // I figli che arrivano nel JSON servono solo per mostrare l'albero nel frontend.
+        if (!prodottoEsistente && nodo.figli != null) {
+            for (BuilderProdottoDto figlio : nodo.figli) {
+                persistiNodoBuilder(figlio, compostoId, prodottoDAO);
+            }
+        }
+
+        return compostoId;
+    }
+
+    /**
+     * Crea una nuova SKU definita nel builder.
+     * Passiamo SKUDAO come parametro così evitiamo di istanziarlo più volte inutilmente.
+     */
+    private int creaNuovaSkuDaBuilder(BuilderSkuDto skuDto, SKUDAO skuDAO)
+            throws SQLException, BusinessValidationException {
 
         if (skuDAO.existsByCodice(skuDto.codice)) {
             throw new BusinessValidationException("Esiste già una SKU con codice " + skuDto.codice);
@@ -435,6 +515,18 @@ public class CreaProdottoServlet extends BaseApiServlet {
         );
     }
 
+    /**
+     * Validazione preliminare lato server del payload del builder.
+     *
+     * Regola importante:
+     * se il nodo ha id != null, è un riferimento a un prodotto già esistente.
+     * Quindi:
+     * - controlliamo i campi base
+     * - NON validiamo ricorsivamente i figli come se fossero nuovi nodi da creare
+     *
+     * Questo è coerente con il frontend, che ora può mandare l'albero completo
+     * di un prodotto esistente solo per visualizzarlo nel builder.
+     */
     private String validaNodoBuilder(BuilderProdottoDto nodo, int profondita) {
         if (nodo == null) {
             return "Nodo prodotto mancante";
@@ -468,6 +560,8 @@ public class CreaProdottoServlet extends BaseApiServlet {
                     return "Una SKU non è valida";
                 }
 
+                // Se la SKU è già esistente, non c'è altro da validare qui:
+                // la sua esistenza reale verrà verificata in persistenza.
                 if (sku.id == null) {
                     if (sku.codice == null || sku.codice < 0) {
                         return "Il codice di una nuova SKU non è valido";
@@ -482,6 +576,8 @@ public class CreaProdottoServlet extends BaseApiServlet {
                     }
                 }
             }
+
+            return null;
         }
 
         if ("COMPOSTO".equals(tipo)) {
@@ -502,6 +598,12 @@ public class CreaProdottoServlet extends BaseApiServlet {
                 return "Ogni prodotto composto deve avere almeno un sottoprodotto";
             }
 
+            // Se il composto è già esistente, i suoi figli nel JSON sono solo descrittivi:
+            // non li validiamo ricorsivamente come nuova struttura.
+            if (nodo.id != null) {
+                return null;
+            }
+
             for (BuilderProdottoDto figlio : nodo.figli) {
                 String errore = validaNodoBuilder(figlio, profondita + 1);
                 if (errore != null) {
@@ -513,14 +615,23 @@ public class CreaProdottoServlet extends BaseApiServlet {
         return null;
     }
 
+    /**
+     * Normalizza una stringa per confronti robusti.
+     */
     private String normalize(String value) {
         return value == null ? null : value.trim().toUpperCase();
     }
 
+    /**
+     * Utility per controllare stringhe vuote o solo whitespace.
+     */
     private boolean isBlank(String valore) {
         return valore == null || valore.isBlank();
     }
 
+    /**
+     * DTO del nodo prodotto inviato dal builder.
+     */
     private static class BuilderProdottoDto {
         Integer id;
         Integer codice;
@@ -533,6 +644,9 @@ public class CreaProdottoServlet extends BaseApiServlet {
         List<BuilderSkuDto> skuList;
     }
 
+    /**
+     * DTO della SKU inviato dal builder.
+     */
     private static class BuilderSkuDto {
         Integer id;
         Integer codice;
@@ -541,6 +655,11 @@ public class CreaProdottoServlet extends BaseApiServlet {
         Double prezzo;
     }
 
+    /**
+     * Eccezione applicativa per errori di validazione del dominio.
+     * La usiamo per mandare al frontend messaggi chiari senza sporcare
+     * la logica con mille return intermedi.
+     */
     private static class BusinessValidationException extends Exception {
         private BusinessValidationException(String message) {
             super(message);

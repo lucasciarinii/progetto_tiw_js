@@ -1,4 +1,5 @@
 window.prodottoPage = (function () {
+    // Modulo della pagina fornitore dedicato alla gestione di prodotti e builder composti.
     let formProdottoSemplice;
     let formProdottoComposto;
     let listaSkuDisponibili;
@@ -15,6 +16,7 @@ window.prodottoPage = (function () {
     let builderSkuSeq = 0;
 
     async function init() {
+        // Cache dei riferimenti ai nodi DOM e caricamento iniziale dei dati disponibili.
         formProdottoSemplice = document.getElementById('form-crea-semplice');
         formProdottoComposto = document.getElementById('form-crea-composto');
         listaSkuDisponibili = document.getElementById('lista-sku-disponibili');
@@ -38,6 +40,7 @@ window.prodottoPage = (function () {
     }
 
     async function onSubmitProdottoSemplice(event) {
+        // Creazione classica di un prodotto semplice con invio form-urlencoded.
         event.preventDefault();
         window.appFornitore.nascondiMessaggi();
 
@@ -46,6 +49,7 @@ window.prodottoPage = (function () {
         }
 
         const formData = new FormData(formProdottoSemplice);
+        formData.append('tipo', 'SEMPLICE');
 
         const codice = String(formData.get('codice') || '').trim();
         const nome = String(formData.get('nome') || '').trim();
@@ -59,7 +63,7 @@ window.prodottoPage = (function () {
             return;
         }
 
-        if (!/^\d+$/.test(codice)) {
+        if (!Number.isInteger(Number(codice)) || Number(codice) < 0) {
             window.appFornitore.mostraMessaggioHome(
                 'Il codice del prodotto semplice non è valido.',
                 'error'
@@ -75,24 +79,11 @@ window.prodottoPage = (function () {
             return;
         }
 
-        const body = new URLSearchParams();
-        body.append('tipo', 'SEMPLICE');
-        body.append('codice', codice);
-        body.append('nome', nome);
-
-        skuIds.forEach((skuId) => {
-            body.append('skuIds', String(skuId));
-        });
-
         try {
             const response = await fetch('apifornitoreprodottocrea', {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json'
-                },
-                body: body.toString()
+                body: formData
             });
 
             const data = await window.appFornitore.parseJsonResponse(response);
@@ -116,6 +107,106 @@ window.prodottoPage = (function () {
             console.error('[prodotto.js] errore creazione prodotto semplice:', error);
             window.appFornitore.mostraMessaggioHome(
                 error.message || 'Errore durante la creazione del prodotto semplice.',
+                'error'
+            );
+        }
+    }
+
+    async function onSubmitProdottoComposto(event) {
+        // Qui non salviamo subito sul backend: iniziamo una bozza locale del builder.
+        event.preventDefault();
+        window.appFornitore.nascondiMessaggi();
+
+        if (!formProdottoComposto) {
+            return;
+        }
+
+        const formData = new FormData(formProdottoComposto);
+
+        const codice = String(formData.get('codice') || '').trim();
+        const nome = String(formData.get('nome') || '').trim();
+        const descrizione = String(formData.get('descrizione') || '').trim();
+        const prezzoMin = String(formData.get('prezzoMin') || '').trim();
+        const prezzoMax = String(formData.get('prezzoMax') || '').trim();
+        const figlioIds = formData.getAll('figlioIds');
+
+        if (!codice || !nome || !descrizione || !prezzoMin || !prezzoMax) {
+            window.appFornitore.mostraMessaggioHome(
+                'Compila tutti i campi del prodotto composto.',
+                'error'
+            );
+            return;
+        }
+
+        if (!Number.isInteger(Number(codice)) || Number(codice) < 0) {
+            window.appFornitore.mostraMessaggioHome(
+                'Il codice del prodotto composto non è valido.',
+                'error'
+            );
+            return;
+        }
+
+        if (
+            Number.isNaN(Number(prezzoMin)) ||
+            Number(prezzoMin) < 0 ||
+            Number.isNaN(Number(prezzoMax)) ||
+            Number(prezzoMax) < 0
+        ) {
+            window.appFornitore.mostraMessaggioHome(
+                'La fascia di prezzo non è valida.',
+                'error'
+            );
+            return;
+        }
+
+        if (Number(prezzoMin) > Number(prezzoMax)) {
+            window.appFornitore.mostraMessaggioHome(
+                'Il prezzo minimo non può superare il massimo.',
+                'error'
+            );
+            return;
+        }
+
+        try {
+            const figliSelezionatiBase = prodottiDisponibiliCache.filter((prodotto) => {
+                return figlioIds.includes(String(prodotto.id))
+                    && prodotto.padreId == null;
+            });
+
+            const figliCompleti = await Promise.all(
+                figliSelezionatiBase.map((prodotto) =>
+                    caricaDettaglioProdotto(prodotto.id, prodotto.tipo)
+                )
+            );
+
+            const figliSelezionati = figliCompleti
+                .map(mappaProdottoEsistentePerBuilder)
+                .filter(Boolean);
+
+            builderState = {
+                clientId: nextBuilderNodeId(),
+                id: null,
+                codice: Number(codice),
+                nome,
+                tipo: 'COMPOSTO',
+                descrizione,
+                prezzoMin: Number(prezzoMin),
+                prezzoMax: Number(prezzoMax),
+                figli: figliSelezionati
+            };
+
+            renderBuilder();
+
+            window.appFornitore.mostraMessaggioHome(
+                figliSelezionati.length > 0
+                    ? 'Bozza del prodotto composto creata con i sottoprodotti selezionati.'
+                    : 'Bozza del prodotto composto creata. Ora puoi aggiungere sottoprodotti e SKU.',
+                'success'
+            );
+        } catch (error) {
+            console.error('[prodotto.js] errore caricamento sottoprodotti iniziali:', error);
+            window.appFornitore.mostraMessaggioHome(
+                error.message || 'Errore durante il caricamento dei prodotti selezionati.',
                 'error'
             );
         }
@@ -148,13 +239,21 @@ window.prodottoPage = (function () {
             const response = await fetch('apifornitoreprodotti-disponibili', {
                 method: 'GET',
                 credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json'
-                }
+                headers: { Accept: 'application/json' }
             });
 
             const data = await window.appFornitore.parseJsonResponse(response);
-            prodottiDisponibiliCache = Array.isArray(data) ? data : [];
+
+            // Filtro difensivo lato client:
+            // nel form devono comparire solo prodotti esistenti senza padre.
+            prodottiDisponibiliCache = Array.isArray(data)
+                ? data.filter((prodotto) => {
+                    return prodotto
+                        && prodotto.id != null
+                        && prodotto.padreId == null;
+                })
+                : [];
+
             renderProdottiDisponibili(prodottiDisponibiliCache);
         } catch (error) {
             console.error('[prodotto.js] errore caricamento prodotti disponibili:', error);
@@ -217,14 +316,22 @@ window.prodottoPage = (function () {
 
         listaFigliDisponibili.innerHTML = '';
 
-        if (!lista || lista.length === 0) {
+        const prodottiRenderizzabili = Array.isArray(lista)
+            ? lista.filter((prodotto) => {
+                return prodotto
+                    && prodotto.id != null
+                    && prodotto.padreId == null;
+            })
+            : [];
+
+        if (prodottiRenderizzabili.length === 0) {
             hintProdottiVuoti.hidden = false;
             return;
         }
 
         hintProdottiVuoti.hidden = true;
 
-        lista.forEach((prodotto) => {
+        prodottiRenderizzabili.forEach((prodotto) => {
             const label = document.createElement('label');
             label.className = 'checkbox-row';
 
@@ -468,6 +575,7 @@ window.prodottoPage = (function () {
         tipo.innerHTML = `Tipo: ${escapeHtml(nodo.tipo)}`;
         card.appendChild(tipo);
 
+        // Solo i composti possono contenere altri sottoprodotti.
         if (nodo.tipo === 'COMPOSTO') {
             card.appendChild(
                 creaRigaCampoProdotto('Descrizione', nodo.descrizione, async (nuovoValore) => {
@@ -614,6 +722,7 @@ window.prodottoPage = (function () {
             card.appendChild(azioni);
         }
 
+        // Solo i semplici possono ricevere SKU nel builder.
         if (nodo.tipo === 'SEMPLICE') {
             const bloccoSku = document.createElement('div');
             bloccoSku.style.marginTop = '0.85rem';
@@ -807,6 +916,7 @@ window.prodottoPage = (function () {
     }
 
     function renderBuilder() {
+        // Ridisegna completamente la bozza corrente del builder nel pannello dettaglio.
         if (!dettaglioContent || !builderState) {
             return;
         }
@@ -907,6 +1017,7 @@ window.prodottoPage = (function () {
     }
 
     function renderBuilderNode(nodo, isRoot) {
+        // Ogni render del builder produce una card ad albero con azioni contestuali.
         const card = document.createElement('div');
         card.className = 'tree-node';
         card.style.marginTop = '0.75rem';
@@ -915,36 +1026,24 @@ window.prodottoPage = (function () {
         header.className = 'tree-meta';
 
         const titolo = document.createElement('div');
-        titolo.textContent = nodo.id != null
-            ? `${nodo.nome} - ${nodo.codice} - ${nodo.tipo} (esistente)`
-            : `${nodo.nome} - ${nodo.codice} - ${nodo.tipo}`;
+        titolo.textContent = `${nodo.nome} - ${nodo.codice} - ${nodo.tipo}`;
         header.appendChild(titolo);
         card.appendChild(header);
 
         const meta = document.createElement('p');
         meta.className = 'muted';
         meta.style.marginTop = '0.35rem';
-
-        if (nodo.tipo === 'COMPOSTO') {
-            if (nodo.id != null) {
-                meta.textContent = 'Prodotto composto esistente collegato';
-            } else {
-                meta.textContent = `Sottoprodotti: ${Array.isArray(nodo.figli) ? nodo.figli.length : 0}`;
-            }
-        } else {
-            if (nodo.id != null) {
-                meta.textContent = `Prodotto semplice esistente collegato - SKU: ${Array.isArray(nodo.skuList) ? nodo.skuList.length : 0}`;
-            } else {
-                meta.textContent = `SKU associate: ${Array.isArray(nodo.skuList) ? nodo.skuList.length : 0}`;
-            }
-        }
-
+        meta.textContent =
+            nodo.tipo === 'COMPOSTO'
+                ? `Sottoprodotti: ${Array.isArray(nodo.figli) ? nodo.figli.length : 0}`
+                : `SKU associate: ${Array.isArray(nodo.skuList) ? nodo.skuList.length : 0}`;
         card.appendChild(meta);
 
         const azioni = document.createElement('div');
         azioni.className = 'actions-row';
         azioni.style.marginTop = '0.75rem';
 
+        // Solo i composti possono contenere altri sottoprodotti.
         if (nodo.tipo === 'COMPOSTO') {
             const addSemplice = document.createElement('button');
             addSemplice.type = 'button';
@@ -971,6 +1070,7 @@ window.prodottoPage = (function () {
             azioni.appendChild(addEsistente);
         }
 
+        // Solo i semplici possono ricevere SKU nel builder.
         if (nodo.tipo === 'SEMPLICE') {
             const addSkuEsistente = document.createElement('button');
             addSkuEsistente.type = 'button';
@@ -1019,7 +1119,9 @@ window.prodottoPage = (function () {
                 }
 
                 builderState = null;
-                dettaglioContent.innerHTML = `<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>`;
+                dettaglioContent.innerHTML =
+                    '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
+
                 window.appFornitore.mostraMessaggioHome('Bozza annullata.', 'success');
             });
 
@@ -1028,6 +1130,7 @@ window.prodottoPage = (function () {
 
         card.appendChild(azioni);
 
+        // Solo i semplici possono ricevere SKU nel builder.
         if (nodo.tipo === 'SEMPLICE') {
             const bloccoSku = document.createElement('div');
             bloccoSku.style.marginTop = '0.85rem';
@@ -1037,7 +1140,7 @@ window.prodottoPage = (function () {
             titoloSku.textContent = 'SKU associate';
             bloccoSku.appendChild(titoloSku);
 
-            if (!Array.isArray(nodo.skuList) || nodo.skuList.length === 0) {
+            if (!nodo.skuList || nodo.skuList.length === 0) {
                 const vuoto = document.createElement('p');
                 vuoto.className = 'muted';
                 vuoto.textContent = 'Nessuna SKU associata.';
@@ -1049,7 +1152,7 @@ window.prodottoPage = (function () {
 
                     const info = document.createElement('div');
                     info.className = 'tree-meta';
-                    info.textContent = `${sku.codice} - ${sku.nome} - ${formattaPrezzo(sku.prezzo)}`;
+                    info.textContent = `${sku.codice} - ${sku.nome || 'Nuova SKU'} - €${formattaPrezzo(sku.prezzo)}`;
 
                     const azioniSku = document.createElement('div');
                     azioniSku.className = 'tree-actions';
@@ -1088,96 +1191,6 @@ window.prodottoPage = (function () {
         }
 
         return card;
-    }
-
-    async function onSubmitProdottoComposto(event) {
-        event.preventDefault();
-        window.appFornitore.nascondiMessaggi();
-
-        if (!formProdottoComposto) {
-            return;
-        }
-
-        const formData = new FormData(formProdottoComposto);
-
-        const codice = String(formData.get('codice') ?? '').trim();
-        const nome = String(formData.get('nome') ?? '').trim();
-        const descrizione = String(formData.get('descrizione') ?? '').trim();
-        const prezzoMin = String(formData.get('prezzoMin') ?? '').trim();
-        const prezzoMax = String(formData.get('prezzoMax') ?? '').trim();
-        const figlioIds = formData.getAll('figlioIds');
-
-        if (!codice || !nome || !descrizione || !prezzoMin || !prezzoMax) {
-            window.appFornitore.mostraMessaggioHome(
-                'Compila tutti i campi del prodotto composto.',
-                'error'
-            );
-            return;
-        }
-
-        if (!Number.isInteger(Number(codice)) || Number(codice) < 0) {
-            window.appFornitore.mostraMessaggioHome(
-                'Il codice del prodotto composto non è valido.',
-                'error'
-            );
-            return;
-        }
-
-        if (
-            Number.isNaN(Number(prezzoMin)) || Number(prezzoMin) < 0 ||
-            Number.isNaN(Number(prezzoMax)) || Number(prezzoMax) < 0
-        ) {
-            window.appFornitore.mostraMessaggioHome(
-                'La fascia di prezzo non è valida.',
-                'error'
-            );
-            return;
-        }
-
-        if (Number(prezzoMin) > Number(prezzoMax)) {
-            window.appFornitore.mostraMessaggioHome(
-                'Il prezzo minimo non può superare il massimo.',
-                'error'
-            );
-            return;
-        }
-
-        try {
-            const figliSelezionatiBase = prodottiDisponibiliCache.filter((prodotto) =>
-                figlioIds.includes(String(prodotto.id))
-            );
-
-            const figliSelezionati = figliSelezionatiBase
-                .map((prodotto) => creaRiferimentoProdottoEsistentePerBuilder(prodotto))
-                .filter(Boolean);
-
-            builderState = {
-                clientId: nextBuilderNodeId(),
-                id: null,
-                codice: Number(codice),
-                nome,
-                tipo: 'COMPOSTO',
-                descrizione,
-                prezzoMin: Number(prezzoMin),
-                prezzoMax: Number(prezzoMax),
-                figli: figliSelezionati
-            };
-
-            renderBuilder();
-
-            window.appFornitore.mostraMessaggioHome(
-                figliSelezionati.length > 0
-                    ? 'Bozza del prodotto composto creata con i sottoprodotti selezionati.'
-                    : 'Bozza del prodotto composto creata. Ora puoi aggiungere sottoprodotti e SKU.',
-                'success'
-            );
-        } catch (error) {
-            console.error('[prodotto.js] errore creazione builder composto:', error);
-            window.appFornitore.mostraMessaggioHome(
-                error.message || 'Errore durante la creazione della bozza del prodotto composto.',
-                'error'
-            );
-        }
     }
 
     function creaRigaCampoProdotto(etichetta, valoreIniziale, onSalva) {
@@ -1351,15 +1364,16 @@ window.prodottoPage = (function () {
 
         return riga;
     }
-    /*
+
     function mappaProdottoEsistentePerBuilder(prodotto) {
+        // Converte il prodotto restituito dal backend in un nodo del builder.
+        // L'id resta quello originale perché il prodotto non viene duplicato: nel builder
+        // stiamo solo preparando il collegamento e mostrando il sottoalbero reale.
         if (!prodotto) {
             return null;
         }
 
-        const tipo = String(prodotto.tipo || '').trim().toUpperCase();
-
-        if (tipo === 'SEMPLICE') {
+        if (prodotto.tipo === 'SEMPLICE') {
             return {
                 clientId: nextBuilderNodeId(),
                 id: prodotto.id,
@@ -1370,35 +1384,32 @@ window.prodottoPage = (function () {
                     ? prodotto.skuList.map((sku) => ({
                         clientSkuId: nextBuilderSkuId(),
                         id: sku.id,
-                        codice: Number(sku.codice),
+                        codice: sku.codice,
                         nome: sku.nome,
                         descrizioneTecnica: sku.descrizioneTecnica,
-                        prezzo: Number(sku.prezzo)
+                        prezzo: Number(sku.prezzo || 0)
                     }))
                     : []
             };
         }
 
-        if (tipo === 'COMPOSTO') {
-            return {
-                clientId: nextBuilderNodeId(),
-                id: prodotto.id,
-                codice: Number(prodotto.codice),
-                nome: prodotto.nome,
-                tipo: 'COMPOSTO',
-                descrizione: prodotto.descrizione || '',
-                prezzoMin: Number(prodotto.prezzoMin) || 0,
-                prezzoMax: Number(prodotto.prezzoMax) || 0,
-                figli: Array.isArray(prodotto.figli)
-                    ? prodotto.figli.map((figlio) => mappaProdottoEsistentePerBuilder(figlio)).filter(Boolean)
-                    : []
-            };
-        }
-
-        return null;
+        return {
+            clientId: nextBuilderNodeId(),
+            id: prodotto.id,
+            codice: Number(prodotto.codice),
+            nome: prodotto.nome,
+            tipo: 'COMPOSTO',
+            descrizione: prodotto.descrizione,
+            prezzoMin: Number(prodotto.prezzoMin || 0),
+            prezzoMax: Number(prodotto.prezzoMax || 0),
+            figli: Array.isArray(prodotto.figli)
+                ? prodotto.figli.map(mappaProdottoEsistentePerBuilder).filter(Boolean)
+                : []
+        };
     }
-      */
+
     function aggiungiFiglioSemplice(parentClientId) {
+        // Aggiunge un nuovo prodotto semplice creato solo nella bozza locale.
         const padre = trovaNodoBuilder(builderState, parentClientId);
         if (!padre || padre.tipo !== 'COMPOSTO') {
             return;
@@ -1435,6 +1446,7 @@ window.prodottoPage = (function () {
     }
 
     function aggiungiFiglioComposto(parentClientId) {
+        // Aggiunge un nuovo prodotto composto creato solo nella bozza locale.
         const padre = trovaNodoBuilder(builderState, parentClientId);
         if (!padre || padre.tipo !== 'COMPOSTO') {
             return;
@@ -1497,6 +1509,7 @@ window.prodottoPage = (function () {
 
         renderBuilder();
     }
+
     async function aggiungiFiglioEsistente(nodeClientId) {
         const nodo = trovaNodoBuilder(builderState, nodeClientId);
         if (!nodo || nodo.tipo !== 'COMPOSTO') {
@@ -1504,10 +1517,16 @@ window.prodottoPage = (function () {
         }
 
         const candidati = prodottiDisponibiliCache.filter((prodotto) => {
-            if (prodotto.id == null) {
+            if (!prodotto || prodotto.id == null) {
                 return false;
             }
 
+            // Un prodotto esistente è selezionabile solo se non ha già un padre.
+            if (prodotto.padreId != null) {
+                return false;
+            }
+
+            // Inoltre non deve essere già presente nel builder corrente.
             return !esisteProdottoConIdNelBuilder(builderState, prodotto.id);
         });
 
@@ -1543,21 +1562,40 @@ window.prodottoPage = (function () {
             return;
         }
 
-        const nodoEsistente = creaRiferimentoProdottoEsistentePerBuilder(selezionato);
+        try {
+            const prodottoCompleto = await caricaDettaglioProdotto(
+                selezionato.id,
+                selezionato.tipo
+            );
 
-        if (!nodoEsistente) {
+            // Carichiamo l'albero completo del prodotto esistente così il builder mostra
+            // davvero tutti i suoi discendenti già presenti a database.
+            const nodoEsistente = mappaProdottoEsistentePerBuilder(prodottoCompleto);
+
+            if (!nodoEsistente) {
+                window.appFornitore.mostraMessaggioHome(
+                    'Impossibile aggiungere il prodotto selezionato.',
+                    'error'
+                );
+                return;
+            }
+
+            // Aggiungiamo al builder un riferimento reale al prodotto esistente.
+            // Più avanti sistemeremo la servlet per ignorare i figli in persistenza
+            // quando il nodo ha già un id, usandoli solo per la visualizzazione.
+            nodo.figli.push(nodoEsistente);
+            renderBuilder();
+        } catch (error) {
+            console.error('[prodotto.js] errore aggiunta prodotto esistente:', error);
             window.appFornitore.mostraMessaggioHome(
-                'Impossibile aggiungere il prodotto selezionato.',
+                error.message || 'Errore durante il caricamento del prodotto esistente.',
                 'error'
             );
-            return;
         }
-
-        nodo.figli.push(nodoEsistente);
-        renderBuilder();
     }
 
     function aggiungiSkuEsistente(nodeClientId) {
+        // Associa al semplice corrente una SKU già esistente a catalogo.
         const nodo = trovaNodoBuilder(builderState, nodeClientId);
         if (!nodo || nodo.tipo !== 'SEMPLICE') {
             return;
@@ -1606,16 +1644,17 @@ window.prodottoPage = (function () {
         nodo.skuList.push({
             clientSkuId: nextBuilderSkuId(),
             id: skuSelezionata.id,
-            codice: Number(skuSelezionata.codice),
+            codice: skuSelezionata.codice,
             nome: skuSelezionata.nome,
             descrizioneTecnica: skuSelezionata.descrizioneTecnica,
-            prezzo: Number(skuSelezionata.prezzo)
+            prezzo: skuSelezionata.prezzo
         });
 
         renderBuilder();
     }
 
     function aggiungiSkuNuova(nodeClientId) {
+        // Crea una nuova SKU nella bozza del builder, senza persisterla subito.
         const nodo = trovaNodoBuilder(builderState, nodeClientId);
         if (!nodo || nodo.tipo !== 'SEMPLICE') {
             return;
@@ -1707,6 +1746,7 @@ window.prodottoPage = (function () {
     }
 
     async function onSalvaBuilder() {
+        // Serializza la bozza e la invia alla servlet che creerà il prodotto composto finale.
         if (!builderState) {
             window.appFornitore.mostraMessaggioHome(
                 'Nessuna bozza presente da salvare.',
@@ -1747,10 +1787,10 @@ window.prodottoPage = (function () {
                 formProdottoComposto.reset();
             }
 
-            if (data && data.tipo) {
+            if (data) {
                 mostraDettaglioProdottoCreato(data);
             } else if (dettaglioContent) {
-                dettaglioContent.innerHTML = `<p class="muted">Prodotto salvato correttamente.</p>`;
+                dettaglioContent.innerHTML = '<p class="muted">Prodotto salvato correttamente.</p>';
             }
 
             await Promise.all([
@@ -1766,13 +1806,12 @@ window.prodottoPage = (function () {
         }
     }
 
-
     function validaBuilder(nodo, profondita) {
         if (!nodo) {
             return 'La bozza del prodotto non è valida.';
         }
 
-        if (profondita > 3) {
+        if (profondita > 4) {
             return 'Profondità massima superata.';
         }
 
@@ -1784,24 +1823,23 @@ window.prodottoPage = (function () {
             return 'Ogni prodotto deve avere un codice valido.';
         }
 
+        // Solo i composti possono contenere altri sottoprodotti.
         if (nodo.tipo === 'COMPOSTO') {
             if (!nodo.descrizione || !String(nodo.descrizione).trim()) {
                 return 'Ogni prodotto composto deve avere una descrizione.';
             }
 
             if (
-                Number.isNaN(Number(nodo.prezzoMin)) || Number(nodo.prezzoMin) < 0 ||
-                Number.isNaN(Number(nodo.prezzoMax)) || Number(nodo.prezzoMax) < 0
+                Number.isNaN(Number(nodo.prezzoMin)) ||
+                Number(nodo.prezzoMin) < 0 ||
+                Number.isNaN(Number(nodo.prezzoMax)) ||
+                Number(nodo.prezzoMax) < 0
             ) {
                 return 'La fascia prezzo di un prodotto composto non è valida.';
             }
 
             if (Number(nodo.prezzoMin) > Number(nodo.prezzoMax)) {
                 return 'Il prezzo minimo non può superare il massimo.';
-            }
-
-            if (nodo.id != null) {
-                return null;
             }
 
             if (!Array.isArray(nodo.figli) || nodo.figli.length === 0) {
@@ -1816,11 +1854,8 @@ window.prodottoPage = (function () {
             }
         }
 
+        // Solo i semplici possono ricevere SKU nel builder.
         if (nodo.tipo === 'SEMPLICE') {
-            if (nodo.id != null) {
-                return null;
-            }
-
             if (!Array.isArray(nodo.skuList) || nodo.skuList.length === 0) {
                 return `Il prodotto semplice ${nodo.nome} deve avere almeno una SKU.`;
             }
@@ -1832,8 +1867,10 @@ window.prodottoPage = (function () {
                     }
 
                     if (
-                        !sku.nome || !String(sku.nome).trim() ||
-                        !sku.descrizioneTecnica || !String(sku.descrizioneTecnica).trim()
+                        !sku.nome ||
+                        !String(sku.nome).trim() ||
+                        !sku.descrizioneTecnica ||
+                        !String(sku.descrizioneTecnica).trim()
                     ) {
                         return 'Compila tutti i campi delle nuove SKU.';
                     }
@@ -1849,33 +1886,20 @@ window.prodottoPage = (function () {
     }
 
     function serializzaNodoBuilder(nodo) {
+        // Solo i semplici possono ricevere SKU nel builder.
         if (nodo.tipo === 'SEMPLICE') {
             return {
                 id: nodo.id ?? null,
                 codice: Number(nodo.codice),
                 nome: nodo.nome,
                 tipo: 'SEMPLICE',
-                skuList: Array.isArray(nodo.skuList)
-                    ? nodo.skuList.map((sku) => {
-                        if (sku.id != null) {
-                            return {
-                                id: sku.id,
-                                codice: null,
-                                nome: null,
-                                descrizioneTecnica: null,
-                                prezzo: null
-                            };
-                        }
-
-                        return {
-                            id: null,
-                            codice: Number(sku.codice),
-                            nome: sku.nome,
-                            descrizioneTecnica: sku.descrizioneTecnica,
-                            prezzo: Number(sku.prezzo)
-                        };
-                    })
-                    : []
+                skuList: nodo.skuList.map((sku) => ({
+                    id: sku.id ?? null,
+                    codice: sku.id ? null : Number(sku.codice),
+                    nome: sku.id ? null : sku.nome,
+                    descrizioneTecnica: sku.id ? null : sku.descrizioneTecnica,
+                    prezzo: sku.id ? null : Number(sku.prezzo)
+                }))
             };
         }
 
@@ -1887,10 +1911,29 @@ window.prodottoPage = (function () {
             descrizione: nodo.descrizione,
             prezzoMin: Number(nodo.prezzoMin),
             prezzoMax: Number(nodo.prezzoMax),
-            figli: Array.isArray(nodo.figli)
-                ? nodo.figli.map(serializzaNodoBuilder)
-                : []
+            figli: nodo.figli.map(serializzaNodoBuilder)
         };
+    }
+
+    function trovaNodoBuilder(radice, clientId) {
+        if (!radice) {
+            return null;
+        }
+
+        if (radice.clientId === clientId) {
+            return radice;
+        }
+
+        if (radice.tipo === 'COMPOSTO' && Array.isArray(radice.figli)) {
+            for (const figlio of radice.figli) {
+                const trovato = trovaNodoBuilder(figlio, clientId);
+                if (trovato) {
+                    return trovato;
+                }
+            }
+        }
+
+        return null;
     }
 
     function removeNodeByClientId(nodo, clientId) {
@@ -1982,16 +2025,16 @@ window.prodottoPage = (function () {
 
     async function rimuoviAssociazioneProdottoSku(prodottoId, skuId) {
         const body = new URLSearchParams();
-        body.append('tipoRelazione', 'PRODOTTO_SKU');
-        body.append('prodottoId', String(prodottoId));
-        body.append('skuId', String(skuId));
+        body.append('tipoRelazione', 'PRODOTTOSKU');
+        body.append('prodottoId', prodottoId);
+        body.append('skuId', skuId);
 
         const response = await fetch('apifornitoreassociazionerimuovi', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
+                Accept: 'application/json'
             },
             body: body.toString()
         });
@@ -2001,70 +2044,23 @@ window.prodottoPage = (function () {
 
     async function rimuoviAssociazionePadreFiglio(figlioId, padreId) {
         const body = new URLSearchParams();
-        body.append('tipoRelazione', 'PADRE_FIGLIO');
-        body.append('figlioId', String(figlioId));
-
-        if (padreId != null) {
-            body.append('padreId', String(padreId));
-        }
+        body.append('tipoRelazione', 'PADREFIGLIO');
+        body.append('figlioId', figlioId);
+        body.append('padreId', padreId);
 
         const response = await fetch('apifornitoreassociazionerimuovi', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
+                Accept: 'application/json'
             },
             body: body.toString()
         });
 
         return window.appFornitore.parseJsonResponse(response);
     }
-    function creaRiferimentoProdottoEsistentePerBuilder(prodotto) {
-        const mappaProdottoEsistentePerBuilder = creaRiferimentoProdottoEsistentePerBuilder;
 
-        if (!prodotto || prodotto.id == null) {
-            return null;
-        }
-
-        const tipo = String(prodotto.tipo || '').trim().toUpperCase();
-
-        if (tipo === 'SEMPLICE') {
-            return {
-                clientId: nextBuilderNodeId(),
-                id: prodotto.id,
-                codice: Number(prodotto.codice),
-                nome: prodotto.nome,
-                tipo: 'SEMPLICE',
-                skuList: Array.isArray(prodotto.skuList)
-                    ? prodotto.skuList.map((sku) => ({
-                        clientSkuId: nextBuilderSkuId(),
-                        id: sku.id,
-                        codice: sku.codice,
-                        nome: sku.nome,
-                        descrizioneTecnica: sku.descrizioneTecnica,
-                        prezzo: Number(sku.prezzo) || 0
-                    }))
-                    : []
-            };
-        }
-
-        if (tipo === 'COMPOSTO') {
-            return {
-                clientId: nextBuilderNodeId(),
-                id: prodotto.id,
-                codice: Number(prodotto.codice),
-                nome: prodotto.nome,
-                tipo: 'COMPOSTO',
-                descrizione: prodotto.descrizione || '',
-                prezzoMin: Number(prodotto.prezzoMin) || 0,
-                prezzoMax: Number(prodotto.prezzoMax) || 0,
-                figli: []
-            };
-        }
-
-        return null;
-    }
     async function eliminaOggetto(id, tipo, returnProdottoId = null) {
         const body = new URLSearchParams();
         body.append('id', id);
