@@ -10,11 +10,10 @@ window.homeClientePage = (function () {
     let paginazioneBox;
 
     // chiamata una sola volta all'avvio dell'app, per inizializzare i riferimenti agli elementi HTML e caricare la prima pagina di prodotti
+    // async perchè in main.js si fa il catch (che esiste solo su una Promise)
     async function init() {
         listaProdotti = document.getElementById('lista-prodotti-home');
         paginazioneBox = document.getElementById('paginazione-home');
-
-        //await caricaPagina(0);
     }
 
     // chiamata ogni volta che la sezione torna visibile
