@@ -1,5 +1,7 @@
 package it.polimi.progetto_tiw_js.api;
 
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSerializer;
 import it.polimi.progetto_tiw_js.beans.Utente;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -14,6 +16,7 @@ import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 
 /**
  * Classe base per tutte le servlet API della versione JavaScript.
@@ -27,6 +30,9 @@ public abstract class BaseApiServlet extends HttpServlet {
     // gson condiviso — serializeNulls per mandare anche i campi null al client
     protected static final Gson gson = new GsonBuilder()
             .serializeNulls()
+            .registerTypeAdapter(java.time.LocalDateTime.class,
+                    (JsonSerializer<LocalDateTime>) (src, type, ctx) ->
+                            new JsonPrimitive(src.toString())) // → "2026-05-22T09:30:00"
             .create();
 
     protected Connection conn;

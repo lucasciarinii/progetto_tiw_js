@@ -554,6 +554,17 @@ public class ProdottoDAO {
         return figli;
     }
 
+    // metodo pubblico usato da GetSottoprodotti
+    public List<Prodotto> findFigliDirettiConSku(int padreId) throws SQLException {
+        List<Prodotto> figli = fetchDirectChildren(padreId); // riusa il privato già esistente
+        for (Prodotto p : figli) {
+            if (p.isSemplice()) {
+                p.setSkuList(fetchSkuListForProduct(p.getId()));
+            }
+        }
+        return figli;
+    }
+
     // Carica la lista degli id SKU associati a un prodotto semplice.
     private List<Integer> fetchSkuIdsForProduct(int prodottoId) throws SQLException {
         String sql = "SELECT sku_id FROM prodotto_sku WHERE prodotto_id = ?";

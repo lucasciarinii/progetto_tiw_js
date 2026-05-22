@@ -39,6 +39,7 @@ public class SessionCheckServlet extends BaseApiServlet {
         utenteJson.addProperty("nome", utente.getNome());
         utenteJson.addProperty("cognome", utente.getCognome());
         utenteJson.addProperty("ruolo", utente.getRuolo());
+        utenteJson.addProperty("id", utente.getId());
 
         risposta.add("utente", utenteJson);
 

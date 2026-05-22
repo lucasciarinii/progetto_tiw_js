@@ -42,7 +42,7 @@ public class LoginServlet extends BaseApiServlet {
 
             if (utente == null) {
                 sendError(resp, HttpServletResponse.SC_UNAUTHORIZED,
-                        "Credenziali non valide");
+                        "Username o password non validi. Riprova.");
                 return;
             }
 

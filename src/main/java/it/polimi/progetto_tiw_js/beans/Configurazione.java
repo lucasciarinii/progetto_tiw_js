@@ -1,7 +1,9 @@
 package it.polimi.progetto_tiw_js.beans;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Configurazione {
@@ -48,5 +50,8 @@ public class Configurazione {
     public void setProdottoId(int prodottoId) { this.prodottoId = prodottoId; }
 
     public Map<Integer, SKU> getSkuScelte() { return skuScelte; }
+    public List<SKU> getSkuScelteList() {
+        return new ArrayList<>(skuScelte.values());
+    }
     public void setSkuScelte(Map<Integer, SKU> skuScelte) { this.skuScelte = skuScelte; }
 }
