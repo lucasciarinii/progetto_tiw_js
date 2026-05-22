@@ -1,5 +1,6 @@
-package it.polimi.progetto_tiw_js.api;
+package it.polimi.progetto_tiw_js.api.fornitore;
 
+import it.polimi.progetto_tiw_js.api.BaseApiServlet;
 import it.polimi.progetto_tiw_js.beans.Prodotto;
 import it.polimi.progetto_tiw_js.beans.SKU;
 import it.polimi.progetto_tiw_js.dao.ProdottoDAO;

@@ -1,6 +1,7 @@
-package it.polimi.progetto_tiw_js.api;
+package it.polimi.progetto_tiw_js.api.fornitore;
 
 import com.google.gson.Gson;
+import it.polimi.progetto_tiw_js.api.BaseApiServlet;
 import it.polimi.progetto_tiw_js.beans.Prodotto;
 import it.polimi.progetto_tiw_js.dao.ProdottoDAO;
 import it.polimi.progetto_tiw_js.dao.SKUDAO;
@@ -15,7 +16,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 @WebServlet("/apifornitoreprodottocrea")
