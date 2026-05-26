@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     //! FUNZIONI
 
-    // aggancia gli eventi di click sui link di navigazione e logout
+    // aggancia gli eventi di click sui link di NAVIGAZIONE e LOGOUT
     function inizializzaEventi() {
         linkHome.forEach(el => el.addEventListener('click', e => {
             e.preventDefault();

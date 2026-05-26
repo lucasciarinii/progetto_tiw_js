@@ -1,0 +1,47 @@
+package it.polimi.progetto_tiw_js.api.cliente;
+
+import it.polimi.progetto_tiw_js.api.BaseApiServlet;
+import it.polimi.progetto_tiw_js.beans.Configurazione;
+import it.polimi.progetto_tiw_js.dao.ConfigurazioneDAO;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.Map;
+
+@WebServlet("/api/cliente/configurazione/clona")
+public class ClonaConfigurazione extends BaseApiServlet {
+
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        if (!isLogged(req, resp)) return;
+        if (!hasRole(req, resp, "CLIENTE")) return;
+
+        int configId;
+        try {
+            configId = Integer.parseInt(req.getParameter("configurazioneId"));
+        } catch (NumberFormatException e) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Parametro non valido.");
+            return;
+        }
+
+        try {
+            ConfigurazioneDAO dao = new ConfigurazioneDAO(conn);
+            Configurazione conf = dao.findById(configId);
+            int clienteId = getUtenteInSessione(req).getId();
+            if (conf == null || conf.getClienteId() != clienteId) {
+                sendError(resp, HttpServletResponse.SC_FORBIDDEN, "Configurazione non trovata.");
+                return;
+            }
+            dao.cloneConfigurazione(configId, clienteId);
+            sendJson(resp, Map.of("ok", true));
+        } catch (SQLException e) {
+            throw new ServletException("Errore DB in ClonaConfigurazione", e);
+        }
+    }
+}
