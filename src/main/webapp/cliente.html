@@ -1,10 +1,267 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pannello Cliente — Configuratore di Prodotto</title>
+
+    <!-- stesso style.css condiviso con il fornitore -->
+    <link rel="stylesheet" href="assets/css/style.css">
+
+    <style>
+        /* ── stili specifici della SPA cliente ───────────────────────────── */
+
+        /* albero scelta SKU: layout identico al template Thymeleaf scelta_sku */
+        .tree-nodo-composto  { margin-bottom: 1rem; }
+        .tree-nodo-semplice  { margin-bottom: 1rem; }
+        .tree-nodo-semplice .form-group { margin-bottom: 0; }
+
+        .tree-nodo-header {
+            font-weight: 600;
+            font-size: 0.9375rem;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+        .tree-nodo-header .codice {
+            font-weight: 400;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            margin-left: 0.5rem;
+        }
+        .tree-nodo-figli {
+            margin-left: 1.25rem;
+            padding-left: 1rem;
+            border-left: 2px solid var(--border);
+        }
+
+        /* paginazione home */
+        .paginazione {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-top: 1.25rem;
+        }
+        .paginazione span {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* lista prodotti home: simile a result-list della ricerca */
+        .prodotti-list { list-style: none; padding: 0; margin: 0; }
+        .prodotti-list li + li { border-top: 1px solid var(--border); }
+
+        /* tabella configurazioni: totale in neretto nel tfoot */
+        tfoot td { font-weight: 600; border-top: 2px solid var(--border); padding: 0.7rem 0.75rem; }
+
+        /* meta dettaglio configurazione */
+        .conf-meta { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+        .conf-meta strong { color: var(--text); }
+    </style>
 </head>
 <body>
-CLIENTE
+
+<!--! SEZIONE HOME ──────────────────────────────────────────────── -->
+<div id="sezione-home">
+    <nav class="navbar">
+        <span class="navbar-brand">Pannello Cliente</span>
+        <ul class="navbar-links">
+            <li><a href="#" class="link-home">Home</a></li>
+            <li><a href="#" class="link-configurazioni">Le mie configurazioni</a></li>
+        </ul>
+        <div style="display:flex; align-items:center; gap:1rem;">
+            <span class="navbar-user">
+                <span style="padding-right: .2rem">Ciao,</span>
+                <span class="utente-nome"></span>
+                <span class="utente-cognome"></span>
+            </span>
+            <button type="button" class="btn btn-ghost btn-sm btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <h1 class="page-title">Prodotti disponibili</h1>
+
+        <div id="message-box-home" class="alert" hidden></div>
+
+        <div class="card">
+            <!-- lista popolata da homecliente.js -->
+            <ul id="lista-prodotti-home" class="prodotti-list"></ul>
+        </div>
+
+        <!-- paginazione: costruita dinamicamente da homecliente.js -->
+        <div id="paginazione-home" class="paginazione" hidden></div>
+    </main>
+</div>
+
+<!--! SEZIONE SCELTA SKU ───────────────────────────────  -->
+<div id="sezione-scelta-sku" hidden>
+    <nav class="navbar">
+        <span class="navbar-brand">Pannello Cliente</span>
+        <ul class="navbar-links">
+            <li><a href="#" class="link-home">Home</a></li>
+            <li><a href="#" class="link-configurazioni">Le mie configurazioni</a></li>
+        </ul>
+        <div style="display:flex; align-items:center; gap:1rem;">
+            <span class="navbar-user">
+                <span class="utente-nome"></span>
+                <span class="utente-cognome"></span>
+            </span>
+            <button type="button" class="btn btn-ghost btn-sm btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <!-- titolo aggiornato dinamicamente da sceltaSku.js -->
+        <h1 class="page-title" id="scelta-sku-titolo">Configurazione prodotto</h1>
+
+        <div id="message-box-scelta-sku" class="alert" hidden></div>
+
+        <!-- nome della configurazione -->
+        <div class="card" style="margin-bottom:1rem;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label for="input-nome-conf">Nome configurazione</label>
+                <input type="text"
+                       id="input-nome-conf"
+                       placeholder="Es. Il mio PC da gaming">
+            </div>
+        </div>
+
+        <!-- albero SKU: costruito dinamicamente da sceltaSku.js -->
+        <div class="card" style="margin-bottom:1rem;">
+            <h2 class="card-title">Selezione componenti</h2>
+            <div id="albero-scelta-sku"></div>
+        </div>
+
+        <button type="button" id="btn-salva-configurazione" class="btn btn-primary">
+            Salva configurazione
+        </button>
+    </main>
+</div>
+
+<!--! SEZIONE "LE MIE CONFIGURAZIONI" ─────────────────────────────── -->
+<div id="sezione-mie-configurazioni" hidden>
+    <nav class="navbar">
+        <span class="navbar-brand">Pannello Cliente</span>
+        <ul class="navbar-links">
+            <li><a href="#" class="link-home">Home</a></li>
+            <li><a href="#" class="link-configurazioni">Le mie configurazioni</a></li>
+        </ul>
+        <div style="display:flex; align-items:center; gap:1rem;">
+            <span class="navbar-user">
+                <span class="utente-nome"></span>
+                <span class="utente-cognome"></span>
+            </span>
+            <button type="button" class="btn btn-ghost btn-sm btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <h1 class="page-title">Le mie configurazioni</h1>
+
+        <div id="message-box-configurazioni" class="alert" hidden></div>
+
+        <!-- stato vuoto -->
+        <div id="configurazioni-vuoto" class="card" hidden>
+            <p style="color:var(--text-muted); text-align:center; padding:1.5rem 0;">
+                Non hai ancora salvato nessuna configurazione.
+            </p>
+        </div>
+
+        <!-- tabella configurazioni -->
+        <div class="table-wrapper card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Creata il</th>
+                        <th>Ultima modifica</th>
+                        <th>Prezzo totale</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody id="configurazioni-tbody">
+                    <!-- righe popolate da configurazioni.js -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!--! SEZIONE DETTAGLIO CONFIGURAZIONE ──────────────────────────── -->
+<div id="sezione-dettaglio" hidden>
+    <nav class="navbar">
+        <span class="navbar-brand">Pannello Cliente</span>
+        <ul class="navbar-links">
+            <li><a href="#" class="link-home">Home</a></li>
+            <li><a href="#" class="link-configurazioni">Le mie configurazioni</a></li>
+        </ul>
+        <div style="display:flex; align-items:center; gap:1rem;">
+            <span class="navbar-user">
+                <span class="utente-nome"></span>
+                <span class="utente-cognome"></span>
+            </span>
+            <button type="button" class="btn btn-ghost btn-sm btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <!-- titolo = nome configurazione -->
+        <h1 class="page-title" id="dettaglio-titolo">Dettaglio configurazione</h1>
+
+        <div id="message-box-dettaglio" class="alert" hidden></div>
+
+        <!-- meta della configurazione -->
+        <div class="card" style="margin-bottom:1rem;">
+            <p class="conf-meta">Creata il: <strong id="dettaglio-data-creazione">—</strong></p>
+            <p class="conf-meta">Ultima modifica: <strong id="dettaglio-data-modifica">—</strong></p>
+            <p class="conf-meta">Prezzo totale: <strong id="dettaglio-prezzo">—</strong></p>
+
+            <div class="actions-row" style="margin-top:1rem;">
+                <button type="button" id="dettaglio-btn-modifica" class="btn btn-outline btn-sm">
+                    Modifica configurazione
+                </button>
+            </div>
+        </div>
+
+        <!-- tabella SKU scelte -->
+        <div class="card">
+            <h2 class="card-title">Componenti scelti</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Codice SKU</th>
+                            <th>Nome</th>
+                            <th>Descrizione tecnica</th>
+                            <th>Prezzo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dettaglio-sku-tbody">
+                        <!-- righe popolate da dettaglio.js -->
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="text-align:right;">Totale</td>
+                            <td id="dettaglio-totale">—</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     SCRIPT JS
+     main.js come ultimo perchè fa DOMContentLoaded
+     e chiama init() su tutti i moduli, che devono già esistere come
+     window.nomeModulo al momento dell'esecuzione.
+     ══════════════════════════════════════════════════════════════ -->
+<script src="js/cliente/homecliente.js" defer></script>
+<script src="js/cliente/sceltaSku.js" defer></script>
+<script src="js/cliente/configurazioni.js" defer></script>
+<script src="js/cliente/dettaglio.js" defer></script>
+<script src="js/cliente/main.js" defer></script>
+
 </body>
 </html>
