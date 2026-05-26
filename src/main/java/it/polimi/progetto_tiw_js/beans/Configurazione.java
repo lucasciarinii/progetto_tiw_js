@@ -50,8 +50,5 @@ public class Configurazione {
     public void setProdottoId(int prodottoId) { this.prodottoId = prodottoId; }
 
     public Map<Integer, SKU> getSkuScelte() { return skuScelte; }
-    public List<SKU> getSkuScelteList() {
-        return new ArrayList<>(skuScelte.values());
-    }
     public void setSkuScelte(Map<Integer, SKU> skuScelte) { this.skuScelte = skuScelte; }
 }

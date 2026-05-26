@@ -702,6 +702,11 @@ tbody tr:hover { background: var(--bg); }
     padding-left: 0.9rem;
 }
 
+/* Usato per gestione apertura / chiusura di un sottoprodotto */
+.tree-collapsed {
+    display: none !important;
+}
+
 .tree-title {
     font-size: 0.95rem;
     font-weight: 600;
