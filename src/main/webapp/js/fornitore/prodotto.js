@@ -192,7 +192,9 @@ window.prodottoPage = (function () {
                 descrizione,
                 prezzoMin: Number(prezzoMin),
                 prezzoMax: Number(prezzoMax),
-                figli: figliSelezionati
+                figli: figliSelezionati,
+                deletedProductIds: new Set(),
+                deletedSkuIds: new Set()
             };
 
             renderBuilder();
@@ -1043,92 +1045,62 @@ window.prodottoPage = (function () {
         azioni.className = 'actions-row';
         azioni.style.marginTop = '0.75rem';
 
-        // Solo i composti possono contenere altri sottoprodotti.
+        const btnRemove = creaBottoneAzione('-', 'btn-warning btn-sm', 'Scollega dal padre');
+        btnRemove.disabled = !!isRoot;
+        btnRemove.addEventListener('click', () => rimuoviNodoDalBuilder(nodo.clientId));
+
+        const btnAdd = creaBottoneAzione('+', 'btn-success btn-sm', 'Aggiungi sottoelemento');
+
+        const btnDelete = creaBottoneAzione('-*', 'btn-danger btn-sm', 'Elimina nodo e discendenti');
+        btnDelete.addEventListener('click', () => {
+            if (isRoot) {
+                eliminaBozzaBuilder();
+                return;
+            }
+            eliminaNodoDalBuilder(nodo.clientId);
+        });
+
+        azioni.appendChild(btnAdd);
+        azioni.appendChild(btnRemove);
+        azioni.appendChild(btnDelete);
+
+        const menu = document.createElement('div');
+        menu.className = 'actions-menu';
+        menu.hidden = true;
+
         if (nodo.tipo === 'COMPOSTO') {
-            const addSemplice = document.createElement('button');
-            addSemplice.type = 'button';
-            addSemplice.className = 'btn btn-ghost btn-sm';
-            addSemplice.textContent = 'semplice';
-            addSemplice.addEventListener('click', () => aggiungiFiglioSemplice(nodo.clientId));
+            menu.appendChild(creaVoceMenu('Sottoprodotto semplice', () => {
+                aggiungiFiglioSemplice(nodo.clientId);
+                menu.hidden = true;
+            }));
 
-            const addComposto = document.createElement('button');
-            addComposto.type = 'button';
-            addComposto.className = 'btn btn-ghost btn-sm';
-            addComposto.textContent = 'composto';
-            addComposto.addEventListener('click', () => aggiungiFiglioComposto(nodo.clientId));
-
-            const addEsistente = document.createElement('button');
-            addEsistente.type = 'button';
-            addEsistente.className = 'btn btn-ghost btn-sm';
-            addEsistente.textContent = 'esistente';
-            addEsistente.addEventListener('click', async () => {
-                await aggiungiFiglioEsistente(nodo.clientId);
-            });
-
-            azioni.appendChild(addSemplice);
-            azioni.appendChild(addComposto);
-            azioni.appendChild(addEsistente);
+            menu.appendChild(creaVoceMenu('Sottoprodotto composto', () => {
+                aggiungiFiglioComposto(nodo.clientId);
+                menu.hidden = true;
+            }));
         }
 
-        // Solo i semplici possono ricevere SKU nel builder.
         if (nodo.tipo === 'SEMPLICE') {
-            const addSkuEsistente = document.createElement('button');
-            addSkuEsistente.type = 'button';
-            addSkuEsistente.className = 'btn btn-ghost btn-sm';
-            addSkuEsistente.textContent = 'SKU esistente';
-            addSkuEsistente.addEventListener('click', () => aggiungiSkuEsistente(nodo.clientId));
+            menu.appendChild(creaVoceMenu('SKU esistente', () => {
+                aggiungiSkuEsistente(nodo.clientId);
+                menu.hidden = true;
+            }));
 
-            const addSkuNuova = document.createElement('button');
-            addSkuNuova.type = 'button';
-            addSkuNuova.className = 'btn btn-ghost btn-sm';
-            addSkuNuova.textContent = 'nuova SKU';
-            addSkuNuova.addEventListener('click', () => aggiungiSkuNuova(nodo.clientId));
-
-            azioni.appendChild(addSkuEsistente);
-            azioni.appendChild(addSkuNuova);
+            menu.appendChild(creaVoceMenu('Nuova SKU', () => {
+                aggiungiSkuNuova(nodo.clientId);
+                menu.hidden = true;
+            }));
         }
 
-        if (!isRoot) {
-            const bottoneRimuovi = document.createElement('button');
-            bottoneRimuovi.type = 'button';
-            bottoneRimuovi.className = 'btn btn-ghost btn-sm';
-            bottoneRimuovi.textContent = '-';
-            bottoneRimuovi.title = 'Rimuovi sottoprodotto';
-            bottoneRimuovi.addEventListener('click', () => rimuoviNodoDalBuilder(nodo.clientId));
-
-            const bottoneElimina = document.createElement('button');
-            bottoneElimina.type = 'button';
-            bottoneElimina.className = 'btn btn-danger btn-sm';
-            bottoneElimina.textContent = '-';
-            bottoneElimina.title = 'Elimina nodo e discendenti';
-            bottoneElimina.addEventListener('click', () => eliminaNodoDalBuilder(nodo.clientId));
-
-            azioni.appendChild(bottoneRimuovi);
-            azioni.appendChild(bottoneElimina);
-        } else {
-            const bottoneElimina = document.createElement('button');
-            bottoneElimina.type = 'button';
-            bottoneElimina.className = 'btn btn-danger btn-sm';
-            bottoneElimina.textContent = 'Elimina bozza';
-            bottoneElimina.addEventListener('click', () => {
-                const conferma = window.confirm(
-                    'Vuoi eliminare l\'intera bozza del prodotto composto?'
-                );
-                if (!conferma) {
-                    return;
-                }
-
-                builderState = null;
-                dettaglioContent.innerHTML =
-                    '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
-
-                window.appFornitore.mostraMessaggioHome('Bozza annullata.', 'success');
-            });
-
-            azioni.appendChild(bottoneElimina);
-        }
+        btnAdd.addEventListener('click', () => {
+            if (!menu.childElementCount) {
+                return;
+            }
+            menu.hidden = !menu.hidden;
+        });
 
         card.appendChild(azioni);
+        card.appendChild(menu);
 
         // Solo i semplici possono ricevere SKU nel builder.
         if (nodo.tipo === 'SEMPLICE') {
@@ -1157,18 +1129,18 @@ window.prodottoPage = (function () {
                     const azioniSku = document.createElement('div');
                     azioniSku.className = 'tree-actions';
 
-                    const bottoneRimuoviSku = document.createElement('button');
-                    bottoneRimuoviSku.type = 'button';
-                    bottoneRimuoviSku.className = 'btn btn-ghost btn-sm';
-                    bottoneRimuoviSku.textContent = '-';
+                    const bottoneRimuoviSku = creaBottoneAzione('-', 'btn-warning btn-sm', 'Rimuovi SKU dal prodotto');
                     bottoneRimuoviSku.addEventListener('click', () => {
-                        nodo.skuList = nodo.skuList.filter(
-                            (item) => item.clientSkuId !== sku.clientSkuId
-                        );
-                        renderBuilder();
+                        rimuoviSkuDalBuilder(nodo, sku);
+                    });
+
+                    const bottoneEliminaSku = creaBottoneAzione('-*', 'btn-danger btn-sm', 'Elimina SKU');
+                    bottoneEliminaSku.addEventListener('click', () => {
+                        eliminaSkuDalBuilder(nodo, sku);
                     });
 
                     azioniSku.appendChild(bottoneRimuoviSku);
+                    azioniSku.appendChild(bottoneEliminaSku);
                     riga.appendChild(info);
                     riga.appendChild(azioniSku);
                     bloccoSku.appendChild(riga);
@@ -1363,6 +1335,41 @@ window.prodottoPage = (function () {
         });
 
         return riga;
+    }
+
+    function creaBottoneAzione(testo, className, title) {
+        const bottone = document.createElement('button');
+        bottone.type = 'button';
+        bottone.className = `btn btn-action ${className}`.trim();
+        bottone.textContent = testo;
+        if (title) {
+            bottone.title = title;
+        }
+        return bottone;
+    }
+
+    function creaVoceMenu(testo, onClick) {
+        const bottone = document.createElement('button');
+        bottone.type = 'button';
+        bottone.className = 'btn btn-ghost btn-sm';
+        bottone.textContent = testo;
+        bottone.addEventListener('click', onClick);
+        return bottone;
+    }
+
+    function eliminaBozzaBuilder() {
+        const conferma = window.confirm('Vuoi eliminare l\'intera bozza del prodotto composto?');
+        if (!conferma) {
+            return;
+        }
+
+        builderState = null;
+        if (dettaglioContent) {
+            dettaglioContent.innerHTML =
+                '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
+        }
+
+        window.appFornitore.mostraMessaggioHome('Bozza annullata.', 'success');
     }
 
     function mappaProdottoEsistentePerBuilder(prodotto) {
@@ -1734,6 +1741,11 @@ window.prodottoPage = (function () {
             return;
         }
 
+        const nodo = trovaNodoBuilder(builderState, clientId);
+        if (!nodo) {
+            return;
+        }
+
         const conferma = window.confirm(
             'Vuoi eliminare questo nodo e tutti i suoi discendenti dalla bozza?'
         );
@@ -1741,7 +1753,57 @@ window.prodottoPage = (function () {
             return;
         }
 
+        registraEliminazioneProdotto(nodo);
         removeNodeByClientId(builderState, clientId);
+        renderBuilder();
+    }
+
+    function registraEliminazioneProdotto(nodo) {
+        if (!builderState || !nodo) {
+            return;
+        }
+
+        if (!builderState.deletedProductIds) {
+            builderState.deletedProductIds = new Set();
+        }
+
+        if (nodo.id != null) {
+            builderState.deletedProductIds.add(nodo.id);
+        }
+
+        if (nodo.tipo === 'COMPOSTO' && Array.isArray(nodo.figli)) {
+            nodo.figli.forEach((figlio) => registraEliminazioneProdotto(figlio));
+        }
+    }
+
+    function rimuoviSkuDalBuilder(nodo, sku) {
+        if (!nodo || !Array.isArray(nodo.skuList)) {
+            return;
+        }
+
+        nodo.skuList = nodo.skuList.filter((item) => item.clientSkuId !== sku.clientSkuId);
+        renderBuilder();
+    }
+
+    function eliminaSkuDalBuilder(nodo, sku) {
+        if (!nodo || !Array.isArray(nodo.skuList)) {
+            return;
+        }
+
+        const conferma = window.confirm('Vuoi eliminare questa SKU dalla bozza?');
+        if (!conferma) {
+            return;
+        }
+
+        if (!builderState.deletedSkuIds) {
+            builderState.deletedSkuIds = new Set();
+        }
+
+        if (sku.id != null) {
+            builderState.deletedSkuIds.add(sku.id);
+        }
+
+        nodo.skuList = nodo.skuList.filter((item) => item.clientSkuId !== sku.clientSkuId);
         renderBuilder();
     }
 
@@ -1762,6 +1824,8 @@ window.prodottoPage = (function () {
         }
 
         const payload = serializzaNodoBuilder(builderState);
+        payload.eliminaProdotti = Array.from(builderState.deletedProductIds || []);
+        payload.eliminaSku = Array.from(builderState.deletedSkuIds || []);
 
         try {
             const response = await fetch('apifornitoreprodottocrea', {
@@ -2111,3 +2175,4 @@ window.prodottoPage = (function () {
         }
     };
 })();
+

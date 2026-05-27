@@ -206,14 +206,41 @@ a:hover { text-decoration: underline; }
     text-decoration: none;
 }
 
+.btn-success {
+    background: #2e7d32;
+    color: #fff;
+    border-color: #2e7d32;
+}
+.btn-success:hover {
+    background: #256528;
+    border-color: #256528;
+    text-decoration: none;
+}
+
+.btn-warning {
+    background: #f1c232;
+    color: #1c1c1a;
+    border-color: #f1c232;
+}
+.btn-warning:hover {
+    background: #d9a821;
+    border-color: #d9a821;
+    text-decoration: none;
+}
+
 .btn-danger {
-    background: transparent;
-    color: var(--error-text);
-    border-color: var(--error-border);
+    background: #b52b1f;
+    color: #fff;
+    border-color: #b52b1f;
 }
 .btn-danger:hover {
-    background: var(--error-bg);
+    background: #9b241a;
+    border-color: #9b241a;
     text-decoration: none;
+}
+
+.btn-action {
+    font-weight: 700;
 }
 
 .btn-sm { padding: 0.3rem 0.75rem; font-size: 0.8125rem; }
@@ -439,6 +466,17 @@ tbody tr:hover { background: var(--bg); }
     gap: 0.5rem;
     flex-wrap: wrap;
     margin-top: 1rem;
+}
+
+.actions-menu {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.actions-menu[hidden] {
+    display: none !important;
 }
 
 /* tabella con nome coerente col tuo html */

@@ -565,7 +565,14 @@ public class ProdottoDAO {
         return figli;
     }
 
-    // Carica la lista degli id SKU associati a un prodotto semplice.
+    public List<Prodotto> findFigliDiretti(int padreId) throws SQLException {
+        return fetchDirectChildren(padreId);
+    }
+
+    public List<Integer> findSkuIdsForProduct(int prodottoId) throws SQLException {
+        return fetchSkuIdsForProduct(prodottoId);
+    }
+
     private List<Integer> fetchSkuIdsForProduct(int prodottoId) throws SQLException {
         String sql = "SELECT sku_id FROM prodotto_sku WHERE prodotto_id = ?";
         List<Integer> skuIds = new ArrayList<>();
