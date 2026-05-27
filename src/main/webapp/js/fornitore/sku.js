@@ -221,31 +221,29 @@ window.skuPage = (function () {
             }
         }));
 
-        const codice = document.createElement('p');
-        codice.innerHTML = `<strong>Codice:</strong> <span>${escapeHtml(sku.codice)}</span>`;
-        wrapper.appendChild(codice);
+        // Campo editabile: codice.
+        wrapper.appendChild(creaCampoEditabileNumero({
+            etichetta: 'Codice',
+            valoreIniziale: sku.codice,
+            integerOnly: true,
+            min: 0,
+            step: '1',
+            onSalva: async (nuovoValore) => {
+                const aggiornato = await aggiornaCampoSku(sku.id, 'codice', nuovoValore);
+                stato.skuSelezionata = normalizzaSkuAggiornata(
+                    aggiornato,
+                    stato.skuSelezionata,
+                    { codice: Number(nuovoValore) }
+                );
 
-        // Se la SKU ha una foto valida, la mostriamo.
-        if (sku.fotografia) {
-            const photoBox = document.createElement('div');
-            photoBox.className = 'detail-photo';
-
-            const img = document.createElement('img');
-            const fotoPath = String(sku.fotografia).trim();
-
-            if (fotoPath.startsWith('http://') || fotoPath.startsWith('https://') || fotoPath.startsWith('/')) {
-                img.src = fotoPath;
-            } else {
-                img.src = `uploads/${fotoPath}`;
+                window.appFornitore.mostraMessaggioHome('SKU aggiornata con successo.', 'success');
+                await caricaListaSku();
+                mostraDettaglioSku(stato.skuSelezionata);
             }
+        }));
 
-            img.alt = `Foto SKU ${sku.nome || ''}`.trim();
-            img.loading = 'lazy';
-            img.decoding = 'async';
-
-            photoBox.appendChild(img);
-            wrapper.appendChild(photoBox);
-        }
+        // Campo editabile: fotografia.
+        wrapper.appendChild(creaCampoFotoEditabile(sku));
 
         const titoloDescrizione = document.createElement('h4');
         titoloDescrizione.className = 'section-title';
@@ -274,23 +272,31 @@ window.skuPage = (function () {
             }
         }));
 
-        // Riga del prezzo.
-        const prezzoBox = document.createElement('p');
-        prezzoBox.className = 'price-line';
-        prezzoBox.innerHTML = `<span>€${formattaPrezzo(sku.prezzo)}</span>`;
-        wrapper.appendChild(prezzoBox);
+        // Campo editabile: prezzo.
+        wrapper.appendChild(creaCampoEditabileNumero({
+            etichetta: 'Prezzo',
+            valoreIniziale: sku.prezzo,
+            integerOnly: false,
+            min: 0,
+            step: '0.01',
+            formatView: (valore) => `€${formattaPrezzo(valore)}`,
+            onSalva: async (nuovoValore) => {
+                const aggiornato = await aggiornaCampoSku(sku.id, 'prezzo', nuovoValore);
+                stato.skuSelezionata = normalizzaSkuAggiornata(
+                    aggiornato,
+                    stato.skuSelezionata,
+                    { prezzo: Number(nuovoValore) }
+                );
+
+                window.appFornitore.mostraMessaggioHome('Prezzo aggiornato con successo.', 'success');
+                await caricaListaSku();
+                mostraDettaglioSku(stato.skuSelezionata);
+            }
+        }));
 
         // Pulsanti azione del dettaglio.
         const azioni = document.createElement('div');
         azioni.className = 'actions-row';
-
-        const btnModificaPrezzo = document.createElement('button');
-        btnModificaPrezzo.type = 'button';
-        btnModificaPrezzo.className = 'btn btn-outline btn-sm';
-        btnModificaPrezzo.textContent = 'Modifica prezzo';
-        btnModificaPrezzo.addEventListener('click', () => {
-            sostituisciPrezzoConInput(prezzoBox, sku);
-        });
 
         const btnEliminaSku = document.createElement('button');
         btnEliminaSku.type = 'button';
@@ -317,7 +323,6 @@ window.skuPage = (function () {
             }
         });
 
-        azioni.appendChild(btnModificaPrezzo);
         azioni.appendChild(btnEliminaSku);
         wrapper.appendChild(azioni);
 
@@ -397,60 +402,184 @@ window.skuPage = (function () {
         return container;
     }
 
-    // Sostituisce la riga del prezzo con un input numerico temporaneo.
-    function sostituisciPrezzoConInput(prezzoBox, sku) {
+    function creaCampoEditabileNumero({
+        etichetta,
+        valoreIniziale,
+        integerOnly,
+        min,
+        step,
+        formatView,
+        onSalva
+    }) {
+        const container = document.createElement('div');
+        container.className = 'form-group';
+
+        if (etichetta) {
+            const label = document.createElement('label');
+            label.textContent = etichetta;
+            container.appendChild(label);
+        }
+
+        const view = document.createElement('p');
+        view.className = 'muted';
+        view.style.cursor = 'pointer';
+        view.title = 'Clicca per modificare';
+
+        const testoView = formatView
+            ? formatView(valoreIniziale)
+            : (valoreIniziale ?? '-').toString();
+        view.textContent = testoView;
+
+        view.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.min = min != null ? String(min) : '0';
+            input.step = step || '1';
+            input.className = 'form-control';
+            input.style.maxWidth = '200px';
+            input.value = valoreIniziale ?? '';
+
+            const salva = async () => {
+                const rawValue = input.value.trim();
+
+                if (rawValue === '') {
+                    window.appFornitore.mostraMessaggioHome('Il valore non può essere vuoto.', 'error');
+                    container.replaceChild(view, input);
+                    return;
+                }
+
+                if (integerOnly && !/^\d+$/.test(rawValue)) {
+                    window.appFornitore.mostraMessaggioHome('Inserisci un numero intero valido.', 'error');
+                    container.replaceChild(view, input);
+                    return;
+                }
+
+                const numero = Number(rawValue);
+                if (Number.isNaN(numero) || (min != null && numero < min)) {
+                    window.appFornitore.mostraMessaggioHome('Il valore inserito non è valido.', 'error');
+                    container.replaceChild(view, input);
+                    return;
+                }
+
+                if (Number(valoreIniziale) === numero) {
+                    container.replaceChild(view, input);
+                    return;
+                }
+
+                try {
+                    await onSalva(rawValue);
+                } catch (error) {
+                    console.error('[sku.js] errore aggiornamento campo numerico SKU:', error);
+                    window.appFornitore.mostraMessaggioHome(
+                        error.message || 'Aggiornamento non riuscito.',
+                        'error'
+                    );
+                    container.replaceChild(view, input);
+                }
+            };
+
+            input.addEventListener('blur', salva, { once: true });
+
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    input.blur();
+                }
+
+                if (event.key === 'Escape') {
+                    container.replaceChild(view, input);
+                }
+            });
+
+            container.replaceChild(input, view);
+            input.focus();
+            input.select?.();
+        });
+
+        container.appendChild(view);
+        return container;
+    }
+
+    function creaCampoFotoEditabile(sku) {
+        const container = document.createElement('div');
+        container.className = 'form-group';
+
+        const label = document.createElement('label');
+        label.textContent = 'Fotografia';
+        container.appendChild(label);
+
+        const box = document.createElement('div');
+        box.className = 'detail-photo';
+        box.style.cursor = 'pointer';
+        box.title = 'Clicca per cambiare la fotografia';
+
+        if (sku.fotografia) {
+            const img = document.createElement('img');
+            img.src = risolviPercorsoFoto(sku.fotografia);
+            img.alt = `Foto SKU ${sku.nome || ''}`.trim();
+            img.loading = 'lazy';
+            img.decoding = 'async';
+
+            box.appendChild(img);
+        } else {
+            const placeholder = document.createElement('p');
+            placeholder.className = 'muted';
+            placeholder.textContent = 'Nessuna fotografia. Clicca per caricarne una.';
+            box.appendChild(placeholder);
+        }
+
         const input = document.createElement('input');
-        input.type = 'number';
-        input.min = '0';
-        input.step = '0.01';
-        input.value = sku?.prezzo ?? '';
-        input.className = 'form-control';
-        input.style.maxWidth = '180px';
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.hidden = true;
 
-        prezzoBox.replaceWith(input);
-        input.focus();
-        input.select?.();
+        const apriFileDialog = () => input.click();
+        box.addEventListener('click', apriFileDialog);
 
-        input.addEventListener('blur', async () => {
-            const nuovoPrezzo = input.value.trim();
+        input.addEventListener('change', async () => {
+            const file = input.files && input.files[0];
+            if (!file) {
+                return;
+            }
 
-            if (nuovoPrezzo === '' || Number.isNaN(Number(nuovoPrezzo)) || Number(nuovoPrezzo) < 0) {
-                window.appFornitore.mostraMessaggioHome('Il prezzo inserito non è valido.', 'error');
-                mostraDettaglioSku(sku);
+            if (!file.type.startsWith('image/')) {
+                window.appFornitore.mostraMessaggioHome('La fotografia deve essere un file immagine valido.', 'error');
+                input.value = '';
+                return;
+            }
+
+            const maxSizeBytes = 5 * 1024 * 1024;
+            if (file.size > maxSizeBytes) {
+                window.appFornitore.mostraMessaggioHome('La fotografia non può superare 5 MB.', 'error');
+                input.value = '';
                 return;
             }
 
             try {
-                const aggiornato = await aggiornaCampoSku(sku.id, 'prezzo', nuovoPrezzo);
+                const aggiornato = await aggiornaFotoSku(sku.id, file);
                 stato.skuSelezionata = normalizzaSkuAggiornata(
                     aggiornato,
                     stato.skuSelezionata,
-                    { prezzo: Number(nuovoPrezzo) }
+                    { fotografia: aggiornato?.fotografia }
                 );
 
-                window.appFornitore.mostraMessaggioHome('Prezzo aggiornato con successo.', 'success');
+                window.appFornitore.mostraMessaggioHome('Fotografia aggiornata con successo.', 'success');
                 await caricaListaSku();
                 mostraDettaglioSku(stato.skuSelezionata);
             } catch (error) {
-                console.error('[sku.js] errore aggiornamento prezzo:', error);
+                console.error('[sku.js] errore aggiornamento fotografia SKU:', error);
                 window.appFornitore.mostraMessaggioHome(
-                    error.message || 'Aggiornamento prezzo non riuscito.',
+                    error.message || 'Aggiornamento fotografia non riuscito.',
                     'error'
                 );
-                mostraDettaglioSku(sku);
-            }
-        }, { once: true });
-
-        input.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                input.blur();
-            }
-
-            if (event.key === 'Escape') {
-                mostraDettaglioSku(sku);
+            } finally {
+                input.value = '';
             }
         });
+
+        container.appendChild(box);
+        container.appendChild(input);
+        return container;
     }
 
     // Fonde il dato appena restituito dal server con quello già presente lato client.
@@ -481,6 +610,25 @@ window.skuPage = (function () {
                 'Accept': 'application/json'
             },
             body: body.toString()
+        });
+
+        return window.appFornitore.parseJsonResponse(response);
+    }
+
+    async function aggiornaFotoSku(skuId, file) {
+        if (!skuId) {
+            throw new Error('SKU non selezionata.');
+        }
+
+        const formData = new FormData();
+        formData.append('id', skuId);
+        formData.append('campo', 'fotografia');
+        formData.append('fotografia', file);
+
+        const response = await fetch('apifornitoreskuaggiorna', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData
         });
 
         return window.appFornitore.parseJsonResponse(response);
@@ -534,6 +682,23 @@ window.skuPage = (function () {
             .replaceAll("'", '&#39;');
     }
 
+    function risolviPercorsoFoto(fotografia) {
+        const fotoPath = String(fotografia || '').trim();
+        if (!fotoPath) {
+            return '';
+        }
+
+        if (fotoPath.startsWith('http://') || fotoPath.startsWith('https://') || fotoPath.startsWith('/')) {
+            return fotoPath;
+        }
+
+        if (fotoPath.startsWith('uploads/')) {
+            return fotoPath;
+        }
+
+        return `uploads/${fotoPath}`;
+    }
+
     // API pubbliche del modulo.
     return {
         init,
@@ -545,3 +710,5 @@ window.skuPage = (function () {
         }
     };
 })();
+
+

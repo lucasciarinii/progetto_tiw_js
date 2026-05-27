@@ -167,12 +167,41 @@ public class SKUDAO {
         return false;
     }
 
+    // Verifica l'unicita del codice escludendo una SKU specifica.
+    public boolean existsByCodiceExceptId(int codice, int id) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM sku WHERE codice = ? AND id <> ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, codice);
+            stmt.setInt(2, id);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+
+        return false;
+    }
+
     // Aggiorna il nome della SKU.
     public void updateNome(int id, String nome) throws SQLException {
         String sql = "UPDATE sku SET nome = ? WHERE id = ?";
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, nome);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
+
+    // Aggiorna il codice della SKU.
+    public void updateCodice(int id, int codice) throws SQLException {
+        String sql = "UPDATE sku SET codice = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, codice);
             stmt.setInt(2, id);
             stmt.executeUpdate();
         }
@@ -195,6 +224,17 @@ public class SKUDAO {
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setDouble(1, prezzo);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
+
+    // Aggiorna la fotografia della SKU.
+    public void updateFotografia(int id, String fotografia) throws SQLException {
+        String sql = "UPDATE sku SET fotografia = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, fotografia);
             stmt.setInt(2, id);
             stmt.executeUpdate();
         }
