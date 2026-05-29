@@ -15,6 +15,16 @@ window.prodottoPage = (function () {
     let builderNodeSeq = 0;
     let builderSkuSeq = 0;
 
+    function mostraMessaggioGlobale(testo, tipo) {
+        if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+            && window.ricercaPage
+            && typeof window.ricercaPage.mostraMessaggioRicerca === 'function') {
+            window.ricercaPage.mostraMessaggioRicerca(testo, tipo);
+            return;
+        }
+        window.appFornitore.mostraMessaggioHome(testo, tipo);
+    }
+
     async function init() {
         // Cache dei riferimenti ai nodi DOM e caricamento iniziale dei dati disponibili.
         formProdottoSemplice = document.getElementById('form-crea-semplice');
@@ -361,6 +371,8 @@ window.prodottoPage = (function () {
             return;
         }
 
+        const mostraMessaggio = mostraMessaggioGlobale;
+
         if (!prodotto) {
             container.innerHTML = '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
             return;
@@ -386,9 +398,25 @@ window.prodottoPage = (function () {
             })
         );
 
-        const codice = document.createElement('p');
-        codice.innerHTML = `Codice: ${escapeHtml(prodotto.codice)}`;
-        wrapper.appendChild(codice);
+        wrapper.appendChild(
+            creaRigaCampoProdotto('Codice', prodotto.codice, async (nuovoValore) => {
+                const codiceNumerico = Number(nuovoValore);
+                if (!Number.isInteger(codiceNumerico) || codiceNumerico < 0) {
+                    window.appFornitore.mostraMessaggioHome(
+                        'Il codice del prodotto non è valido.',
+                        'error'
+                    );
+                    throw new Error('Codice non valido');
+                }
+
+                const aggiornato = await aggiornaCampoProdotto(prodotto.id, 'codice', codiceNumerico);
+                mostraDettaglioProdottoCreato(
+                    aggiornato || { ...prodotto, codice: codiceNumerico },
+                    container
+                );
+                await caricaProdottiDisponibili();
+            })
+        );
 
         const tipo = document.createElement('p');
         tipo.innerHTML = `Tipo: ${escapeHtml(prodotto.tipo)}`;
@@ -408,8 +436,9 @@ window.prodottoPage = (function () {
 
         const bottoneElimina = document.createElement('button');
         bottoneElimina.type = 'button';
-        bottoneElimina.className = 'btn btn-danger btn-sm';
-        bottoneElimina.textContent = 'Elimina prodotto';
+        bottoneElimina.className = 'btn btn-action btn-danger btn-sm';
+        bottoneElimina.textContent = '-*';
+        bottoneElimina.title = 'Elimina prodotto';
         bottoneElimina.addEventListener('click', async () => {
             const conferma = window.confirm('Vuoi eliminare questo prodotto?');
             if (!conferma) {
@@ -419,10 +448,13 @@ window.prodottoPage = (function () {
             try {
                 await eliminaOggetto(prodotto.id, prodotto.tipo);
 
-                window.appFornitore.mostraMessaggioHome(
-                    'Prodotto eliminato con successo.',
-                    'success'
-                );
+                if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+                    && window.ricercaPage
+                    && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
+                    window.ricercaPage.rimuoviRisultatoDaLista(prodotto.id, 'PRODOTTO');
+                }
+
+                mostraMessaggio('Prodotto eliminato con successo.', 'success');
 
                 container.innerHTML =
                     '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
@@ -433,7 +465,7 @@ window.prodottoPage = (function () {
                 ]);
             } catch (error) {
                 console.error('[prodotto.js] errore eliminazione prodotto:', error);
-                window.appFornitore.mostraMessaggioHome(
+                mostraMessaggio(
                     error.message || 'Errore durante l\'eliminazione del prodotto.',
                     'error'
                 );
@@ -557,6 +589,8 @@ window.prodottoPage = (function () {
         card.className = 'tree-node';
         card.style.marginTop = '0.75rem';
 
+        const mostraMessaggio = mostraMessaggioGlobale;
+
         card.appendChild(
             creaRigaCampoProdotto('Nome', nodo.nome, async (nuovoValore) => {
                 const aggiornato = await aggiornaCampoProdotto(nodo.id, 'nome', nuovoValore);
@@ -643,8 +677,9 @@ window.prodottoPage = (function () {
         if (padreId != null && nodo.id != null) {
             const bottoneRimuovi = document.createElement('button');
             bottoneRimuovi.type = 'button';
-            bottoneRimuovi.className = 'btn btn-ghost btn-sm';
-            bottoneRimuovi.textContent = 'Rimuovi';
+            bottoneRimuovi.className = 'btn btn-action btn-warning btn-sm';
+            bottoneRimuovi.textContent = '-';
+            bottoneRimuovi.title = 'Rimuovi';
             bottoneRimuovi.addEventListener('click', async () => {
                 const conferma = window.confirm('Vuoi scollegare questo sottoprodotto?');
                 if (!conferma) {
@@ -654,10 +689,13 @@ window.prodottoPage = (function () {
                 try {
                     const aggiornato = await rimuoviAssociazionePadreFiglio(nodo.id, padreId);
 
-                    window.appFornitore.mostraMessaggioHome(
-                        'Sottoprodotto rimosso correttamente.',
-                        'success'
-                    );
+                    if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+                        && window.ricercaPage
+                        && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
+                        window.ricercaPage.rimuoviRisultatoDaLista(nodo.id, 'PRODOTTO');
+                    }
+
+                    mostraMessaggio('Sottoprodotto rimosso correttamente.', 'success');
 
                     if (aggiornato) {
                         mostraDettaglioProdottoCreato(aggiornato, container);
@@ -668,7 +706,7 @@ window.prodottoPage = (function () {
                     await caricaProdottiDisponibili();
                 } catch (error) {
                     console.error('[prodotto.js] errore rimozione sottoprodotto:', error);
-                    window.appFornitore.mostraMessaggioHome(
+                    mostraMessaggio(
                         error.message || 'Errore durante la rimozione del sottoprodotto.',
                         'error'
                     );
@@ -681,8 +719,9 @@ window.prodottoPage = (function () {
         if (nodo.id != null) {
             const bottoneElimina = document.createElement('button');
             bottoneElimina.type = 'button';
-            bottoneElimina.className = 'btn btn-danger btn-sm';
-            bottoneElimina.textContent = 'Elimina';
+            bottoneElimina.className = 'btn btn-action btn-danger btn-sm';
+            bottoneElimina.textContent = '-*';
+            bottoneElimina.title = 'Elimina';
             bottoneElimina.addEventListener('click', async () => {
                 const conferma = window.confirm('Vuoi eliminare questo prodotto?');
                 if (!conferma) {
@@ -692,10 +731,13 @@ window.prodottoPage = (function () {
                 try {
                     await eliminaOggetto(nodo.id, nodo.tipo);
 
-                    window.appFornitore.mostraMessaggioHome(
-                        'Prodotto eliminato con successo.',
-                        'success'
-                    );
+                    if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+                        && window.ricercaPage
+                        && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
+                        window.ricercaPage.rimuoviRisultatoDaLista(nodo.id, 'PRODOTTO');
+                    }
+
+                    mostraMessaggio('Prodotto eliminato con successo.', 'success');
 
                     if (padreId != null) {
                         await refreshContenitoreDaPadre(padreId, container);
@@ -710,7 +752,7 @@ window.prodottoPage = (function () {
                     ]);
                 } catch (error) {
                     console.error('[prodotto.js] errore eliminazione prodotto figlio:', error);
-                    window.appFornitore.mostraMessaggioHome(
+                    mostraMessaggio(
                         error.message || 'Errore durante l\'eliminazione del prodotto.',
                         'error'
                     );
@@ -796,57 +838,86 @@ window.prodottoPage = (function () {
         const azioni = document.createElement('div');
         azioni.className = 'tree-actions';
 
-        if (Array.isArray(prodottoPadre.skuList) && prodottoPadre.skuList.length > 1) {
-            const bottoneRimuovi = document.createElement('button');
-            bottoneRimuovi.type = 'button';
-            bottoneRimuovi.className = 'btn btn-ghost btn-sm';
-            bottoneRimuovi.textContent = 'Rimuovi';
-            bottoneRimuovi.addEventListener('click', async () => {
-                const conferma = window.confirm(
-                    'Vuoi rimuovere questa SKU dal prodotto semplice?'
+        const getSkuCount = () => {
+            if (Array.isArray(prodottoPadre.skuList)) {
+                return prodottoPadre.skuList.length;
+            }
+            return container?.querySelectorAll?.('.tree-sku-row')?.length || 0;
+        };
+
+        const mostraMessaggio = mostraMessaggioGlobale;
+
+        const mostraErroreUltimaSku = (testo) => {
+            mostraMessaggio(testo, 'error');
+        };
+
+        const bottoneRimuovi = document.createElement('button');
+        bottoneRimuovi.type = 'button';
+        bottoneRimuovi.className = 'btn btn-action btn-warning btn-sm';
+        bottoneRimuovi.textContent = '-';
+        bottoneRimuovi.title = 'Rimuovi';
+        bottoneRimuovi.addEventListener('click', async () => {
+            if (getSkuCount() <= 1) {
+                mostraErroreUltimaSku('Non puoi rimuovere l\'ultima SKU di un prodotto semplice.');
+                return;
+            }
+
+            const conferma = window.confirm(
+                'Vuoi rimuovere questa SKU dal prodotto semplice?'
+            );
+            if (!conferma) {
+                return;
+            }
+
+            try {
+                const aggiornato = await rimuoviAssociazioneProdottoSku(
+                    prodottoPadre.id,
+                    sku.id
                 );
-                if (!conferma) {
-                    return;
+
+                if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+                    && window.ricercaPage
+                    && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
+                    window.ricercaPage.rimuoviRisultatoDaLista(sku.id, 'SKU');
                 }
 
-                try {
-                    const aggiornato = await rimuoviAssociazioneProdottoSku(
-                        prodottoPadre.id,
-                        sku.id
-                    );
+                mostraMessaggio(
+                    'SKU rimossa dal prodotto.',
+                    'success'
+                );
 
-                    window.appFornitore.mostraMessaggioHome(
-                        'SKU rimossa dal prodotto.',
-                        'success'
-                    );
-
-                    if (aggiornato) {
-                        mostraDettaglioProdottoCreato(aggiornato, container);
-                    } else {
-                        await refreshContenitoreDaPadre(prodottoPadre.id, container);
-                    }
-
-                    await Promise.all([
-                        caricaProdottiDisponibili(),
-                        caricaSkuDisponibili()
-                    ]);
-                } catch (error) {
-                    console.error('[prodotto.js] errore rimozione SKU:', error);
-                    window.appFornitore.mostraMessaggioHome(
-                        error.message || 'Errore durante la rimozione della SKU.',
-                        'error'
-                    );
+                if (aggiornato) {
+                    mostraDettaglioProdottoCreato(aggiornato, container);
+                } else {
+                    await refreshContenitoreDaPadre(prodottoPadre.id, container);
                 }
-            });
 
-            azioni.appendChild(bottoneRimuovi);
-        }
+                await Promise.all([
+                    caricaProdottiDisponibili(),
+                    caricaSkuDisponibili()
+                ]);
+            } catch (error) {
+                console.error('[prodotto.js] errore rimozione SKU:', error);
+                mostraMessaggio(
+                    error.message || 'Errore durante la rimozione della SKU.',
+                    'error'
+                );
+            }
+        });
+
+        azioni.appendChild(bottoneRimuovi);
 
         const bottoneElimina = document.createElement('button');
         bottoneElimina.type = 'button';
-        bottoneElimina.className = 'btn btn-danger btn-sm';
-        bottoneElimina.textContent = 'Elimina';
+        bottoneElimina.className = 'btn btn-action btn-danger btn-sm';
+        bottoneElimina.textContent = '-*';
+        bottoneElimina.title = 'Elimina';
         bottoneElimina.addEventListener('click', async () => {
+            if (getSkuCount() <= 1) {
+                mostraErroreUltimaSku('Non puoi eliminare l\'ultima SKU di un prodotto semplice.');
+                return;
+            }
+
             const conferma = window.confirm('Vuoi eliminare definitivamente questa SKU?');
             if (!conferma) {
                 return;
@@ -855,7 +926,13 @@ window.prodottoPage = (function () {
             try {
                 const risultato = await eliminaOggetto(sku.id, 'SKU', prodottoPadre.id);
 
-                window.appFornitore.mostraMessaggioHome(
+                if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+                    && window.ricercaPage
+                    && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
+                    window.ricercaPage.rimuoviRisultatoDaLista(sku.id, 'SKU');
+                }
+
+                mostraMessaggio(
                     'SKU eliminata con successo.',
                     'success'
                 );
@@ -872,7 +949,7 @@ window.prodottoPage = (function () {
                 ]);
             } catch (error) {
                 console.error('[prodotto.js] errore eliminazione SKU:', error);
-                window.appFornitore.mostraMessaggioHome(
+                mostraMessaggio(
                     error.message || 'Errore durante l\'eliminazione della SKU.',
                     'error'
                 );
@@ -940,32 +1017,26 @@ window.prodottoPage = (function () {
         );
 
         wrapper.appendChild(
-            creaRigaBuilderRoot('Descrizione', builderState.descrizione, async (valore) => {
-                builderState.descrizione = valore;
+            creaRigaBuilderRoot('Codice', builderState.codice, async (valore) => {
+                const codiceNumerico = Number(valore);
+                if (!Number.isInteger(codiceNumerico) || codiceNumerico < 0) {
+                    window.appFornitore.mostraMessaggioHome(
+                        'Il codice del prodotto composto non è valido.',
+                        'error'
+                    );
+                    throw new Error('Codice non valido');
+                }
+
+                builderState.codice = codiceNumerico;
                 renderBuilder();
             })
         );
 
         wrapper.appendChild(
-            creaRigaBuilderRoot(
-                'Prezzo minimo',
-                formattaPrezzo(builderState.prezzoMin),
-                async (valore) => {
-                    builderState.prezzoMin = Number(valore);
-                    renderBuilder();
-                }
-            )
-        );
-
-        wrapper.appendChild(
-            creaRigaBuilderRoot(
-                'Prezzo massimo',
-                formattaPrezzo(builderState.prezzoMax),
-                async (valore) => {
-                    builderState.prezzoMax = Number(valore);
-                    renderBuilder();
-                }
-            )
+            creaRigaBuilderRoot('Descrizione', builderState.descrizione, async (valore) => {
+                builderState.descrizione = valore;
+                renderBuilder();
+            })
         );
 
         const codice = document.createElement('p');
@@ -1061,9 +1132,10 @@ window.prodottoPage = (function () {
         });
 
         azioni.appendChild(btnAdd);
-        azioni.appendChild(btnRemove);
-        azioni.appendChild(btnDelete);
-
+        if (!isRoot) {
+            azioni.appendChild(btnRemove);
+            azioni.appendChild(btnDelete);
+        }
         const menu = document.createElement('div');
         menu.className = 'actions-menu';
         menu.hidden = true;
@@ -2089,7 +2161,7 @@ window.prodottoPage = (function () {
 
     async function rimuoviAssociazioneProdottoSku(prodottoId, skuId) {
         const body = new URLSearchParams();
-        body.append('tipoRelazione', 'PRODOTTOSKU');
+        body.append('tipoRelazione', 'PRODOTTO_SKU');
         body.append('prodottoId', prodottoId);
         body.append('skuId', skuId);
 
@@ -2108,7 +2180,7 @@ window.prodottoPage = (function () {
 
     async function rimuoviAssociazionePadreFiglio(figlioId, padreId) {
         const body = new URLSearchParams();
-        body.append('tipoRelazione', 'PADREFIGLIO');
+        body.append('tipoRelazione', 'PADRE_FIGLIO');
         body.append('figlioId', figlioId);
         body.append('padreId', padreId);
 
@@ -2175,4 +2247,7 @@ window.prodottoPage = (function () {
         }
     };
 })();
+
+
+
 

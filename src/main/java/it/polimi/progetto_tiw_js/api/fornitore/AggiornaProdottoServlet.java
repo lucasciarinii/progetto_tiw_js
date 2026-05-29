@@ -73,6 +73,31 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                     prodottoDAO.updateNome(id, nome);
                 }
 
+                case "codice" -> {
+                    int codice;
+                    try {
+                        codice = Integer.parseInt(valore.trim());
+                    } catch (NumberFormatException e) {
+                        sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                                "Codice non valido");
+                        return;
+                    }
+
+                    if (codice < 0) {
+                        sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                                "Il codice deve essere maggiore o uguale a 0");
+                        return;
+                    }
+
+                    if (prodottoDAO.existsByCodiceExceptId(codice, id)) {
+                        sendError(resp, HttpServletResponse.SC_CONFLICT,
+                                "Esiste già un prodotto con questo codice");
+                        return;
+                    }
+
+                    prodottoDAO.updateCodice(id, codice);
+                }
+
                 case "descrizione" -> {
                     if (!"COMPOSTO".equals(tipoProdotto)) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,

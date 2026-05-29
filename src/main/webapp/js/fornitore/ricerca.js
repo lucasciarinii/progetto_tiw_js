@@ -1,4 +1,3 @@
-
 window.ricercaPage = (function () {
     const stato = {
         keywordCorrente: '',
@@ -280,6 +279,57 @@ window.ricercaPage = (function () {
         `;
     }
 
+    function rimuoviRisultatoDaLista(id, categoria) {
+        if (id == null || !categoria) {
+            return;
+        }
+
+        stato.risultati = stato.risultati.filter((item) => {
+            return !(String(item.id) === String(id) && item.categoria === categoria);
+        });
+
+        if (stato.selezionato &&
+            String(stato.selezionato.id) === String(id) &&
+            stato.selezionato.categoria === categoria) {
+            stato.selezionato = null;
+            stato.dettaglioCompleto = null;
+            renderDettaglioVuoto();
+        }
+
+        renderRisultati();
+    }
+
+    function aggiornaRisultatoInLista(id, categoria, patch) {
+        if (id == null || !categoria || !patch) {
+            return;
+        }
+
+        stato.risultati = stato.risultati.map((item) => {
+            if (String(item.id) !== String(id) || item.categoria !== categoria) {
+                return item;
+            }
+
+            const aggiornato = {
+                ...item,
+                ...patch,
+                raw: { ...(item.raw || {}), ...patch }
+            };
+
+            return aggiornato;
+        });
+
+        if (stato.selezionato
+            && String(stato.selezionato.id) === String(id)
+            && stato.selezionato.categoria === categoria) {
+            stato.selezionato = { ...stato.selezionato, ...patch };
+            if (stato.dettaglioCompleto) {
+                stato.dettaglioCompleto = { ...stato.dettaglioCompleto, ...patch };
+            }
+        }
+
+        renderRisultati();
+    }
+
     function mostraMessaggioRicerca(messaggio, tipo) {
         if (!messageBoxRicerca) {
             return;
@@ -335,6 +385,9 @@ window.ricercaPage = (function () {
     }
 
     return {
-        init
+        init,
+        rimuoviRisultatoDaLista,
+        aggiornaRisultatoInLista,
+        mostraMessaggioRicerca
     };
 })();

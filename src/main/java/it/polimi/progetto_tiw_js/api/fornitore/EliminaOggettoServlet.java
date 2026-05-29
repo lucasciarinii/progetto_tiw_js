@@ -135,6 +135,13 @@ public class EliminaOggettoServlet extends BaseApiServlet {
             return;
         }
 
+        if (prodotto.getPadreId() != null
+                && prodottoDAO.findFigliDiretti(prodotto.getPadreId()).size() <= 1) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Non puoi eliminare l'ultimo sottoprodotto del composto");
+            return;
+        }
+
         prodottoDAO.deleteProdotto(id);
         sendJson(resp, createOkResponse());
     }
@@ -153,6 +160,13 @@ public class EliminaOggettoServlet extends BaseApiServlet {
         if (!"COMPOSTO".equalsIgnoreCase(prodotto.getTipo())) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Il tipo dell'oggetto non corrisponde a un prodotto composto");
+            return;
+        }
+
+        if (prodotto.getPadreId() != null
+                && prodottoDAO.findFigliDiretti(prodotto.getPadreId()).size() <= 1) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Non puoi eliminare l'ultimo sottoprodotto del composto");
             return;
         }
 

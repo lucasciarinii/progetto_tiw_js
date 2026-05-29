@@ -451,6 +451,24 @@ public class ProdottoDAO {
         return false;
     }
 
+    // Verifica se esiste già un prodotto con lo stesso codice, escludendo l'id indicato.
+    public boolean existsByCodiceExceptId(int codice, int id) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM prodotto WHERE codice = ? AND id <> ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, codice);
+            stmt.setInt(2, id);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Misura l'altezza del sottoalbero radicato nel prodotto dato.
      * Una foglia vale 0, un nodo con figli foglia vale 1 e così via.
@@ -683,6 +701,17 @@ public class ProdottoDAO {
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, nome);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        }
+    }
+
+    // Aggiorna il codice del prodotto.
+    public void updateCodice(int id, int codice) throws SQLException {
+        String sql = "UPDATE prodotto SET codice = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, codice);
             stmt.setInt(2, id);
             stmt.executeUpdate();
         }

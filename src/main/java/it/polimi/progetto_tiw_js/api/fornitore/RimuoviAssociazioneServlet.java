@@ -201,6 +201,12 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
             return;
         }
 
+        if (prodottoDAO.findFigliDiretti(padreIdReale).size() <= 1) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Non puoi rimuovere l'ultimo sottoprodotto del composto");
+            return;
+        }
+
         prodottoDAO.removePadre(figlioId);
 
         Prodotto padreAggiornato = prodottoDAO.findByIdConDiscendenti(padreIdReale);

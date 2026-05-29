@@ -13,6 +13,16 @@ window.skuPage = (function () {
     let hintSkuVuote;
     let dettaglioContent;
 
+    function mostraMessaggioGlobale(testo, tipo) {
+        if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+            && window.ricercaPage
+            && typeof window.ricercaPage.mostraMessaggioRicerca === 'function') {
+            window.ricercaPage.mostraMessaggioRicerca(testo, tipo);
+            return;
+        }
+        window.appFornitore.mostraMessaggioHome(testo, tipo);
+    }
+
     // Inizializzazione del modulo.
     // Recupera gli elementi dal DOM, aggancia gli eventi e carica i dati iniziali.
     async function init() {
@@ -187,6 +197,15 @@ window.skuPage = (function () {
             return;
         }
 
+        const aggiornaRisultatoRicerca = (patch) => {
+            if (window.appFornitore.getSezioneCorrente?.() !== 'ricerca') {
+                return;
+            }
+            if (window.ricercaPage && typeof window.ricercaPage.aggiornaRisultatoInLista === 'function') {
+                window.ricercaPage.aggiornaRisultatoInLista(sku.id, 'SKU', patch);
+            }
+        };
+
         if (!sku) {
             renderMessaggioDettaglioVuoto(container);
             return;
@@ -215,9 +234,10 @@ window.skuPage = (function () {
                     { nome: nuovoValore }
                 );
 
-                window.appFornitore.mostraMessaggioHome('SKU aggiornata con successo.', 'success');
+                mostraMessaggioGlobale('SKU aggiornata con successo.', 'success');
                 await caricaListaSku();
-                mostraDettaglioSku(stato.skuSelezionata);
+                aggiornaRisultatoRicerca({ nome: nuovoValore });
+                renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
         }));
 
@@ -236,9 +256,10 @@ window.skuPage = (function () {
                     { codice: Number(nuovoValore) }
                 );
 
-                window.appFornitore.mostraMessaggioHome('SKU aggiornata con successo.', 'success');
+                mostraMessaggioGlobale('SKU aggiornata con successo.', 'success');
                 await caricaListaSku();
-                mostraDettaglioSku(stato.skuSelezionata);
+                aggiornaRisultatoRicerca({ codice: Number(nuovoValore) });
+                renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
         }));
 
@@ -266,9 +287,10 @@ window.skuPage = (function () {
                     { descrizioneTecnica: nuovoValore }
                 );
 
-                window.appFornitore.mostraMessaggioHome('SKU aggiornata con successo.', 'success');
+                mostraMessaggioGlobale('SKU aggiornata con successo.', 'success');
                 await caricaListaSku();
-                mostraDettaglioSku(stato.skuSelezionata);
+                aggiornaRisultatoRicerca({ descrizioneTecnica: nuovoValore });
+                renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
         }));
 
@@ -288,9 +310,10 @@ window.skuPage = (function () {
                     { prezzo: Number(nuovoValore) }
                 );
 
-                window.appFornitore.mostraMessaggioHome('Prezzo aggiornato con successo.', 'success');
+                mostraMessaggioGlobale('Prezzo aggiornato con successo.', 'success');
                 await caricaListaSku();
-                mostraDettaglioSku(stato.skuSelezionata);
+                aggiornaRisultatoRicerca({ prezzo: Number(nuovoValore) });
+                renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
         }));
 
@@ -298,32 +321,48 @@ window.skuPage = (function () {
         const azioni = document.createElement('div');
         azioni.className = 'actions-row';
 
-        const btnEliminaSku = document.createElement('button');
-        btnEliminaSku.type = 'button';
-        btnEliminaSku.className = 'btn btn-danger btn-sm';
-        btnEliminaSku.textContent = 'Elimina SKU';
-        btnEliminaSku.addEventListener('click', async () => {
-            const conferma = window.confirm('Vuoi eliminare questa SKU?');
+        const mostraMessaggio = mostraMessaggioGlobale;
+
+        const bottoneElimina = document.createElement('button');
+        bottoneElimina.type = 'button';
+        bottoneElimina.className = 'btn btn-action btn-danger btn-sm';
+        bottoneElimina.textContent = '-*';
+        bottoneElimina.title = 'Elimina SKU';
+        bottoneElimina.addEventListener('click', async () => {
+            const conferma = window.confirm('Vuoi eliminare definitivamente questa SKU?');
             if (!conferma) {
                 return;
             }
 
             try {
                 await eliminaSku(sku.id);
-                stato.skuSelezionata = null;
-                window.appFornitore.mostraMessaggioHome('SKU eliminata con successo.', 'success');
-                await caricaListaSku();
-                renderMessaggioDettaglioVuoto(container);
+
+                if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+                    && window.ricercaPage
+                    && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
+                    window.ricercaPage.rimuoviRisultatoDaLista(sku.id, 'SKU');
+                }
+
+                mostraMessaggio(
+                    'SKU eliminata con successo.',
+                    'success'
+                );
+
+                container.innerHTML =
+                    '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
+
+                await Promise.all([
+                    caricaListaSku(),
+                     window.prodottoPage?.caricaSkuDisponibili?.()
+                 ]);
             } catch (error) {
                 console.error('[sku.js] errore eliminazione SKU:', error);
-                window.appFornitore.mostraMessaggioHome(
-                    error.message || 'Errore durante l\'eliminazione della SKU.',
-                    'error'
-                );
+                const messaggio = error.message || 'Errore durante l\'eliminazione della SKU.';
+                mostraMessaggio(messaggio, 'error');
             }
         });
 
-        azioni.appendChild(btnEliminaSku);
+        azioni.appendChild(bottoneElimina);
         wrapper.appendChild(azioni);
 
         container.appendChild(wrapper);
@@ -563,7 +602,7 @@ window.skuPage = (function () {
                     { fotografia: aggiornato?.fotografia }
                 );
 
-                window.appFornitore.mostraMessaggioHome('Fotografia aggiornata con successo.', 'success');
+                mostraMessaggioGlobale('Fotografia aggiornata con successo.', 'success');
                 await caricaListaSku();
                 mostraDettaglioSku(stato.skuSelezionata);
             } catch (error) {
@@ -710,5 +749,11 @@ window.skuPage = (function () {
         }
     };
 })();
+
+
+
+
+
+
 
 
