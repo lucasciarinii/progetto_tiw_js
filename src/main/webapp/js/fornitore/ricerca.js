@@ -299,6 +299,78 @@ window.ricercaPage = (function () {
         renderRisultati();
     }
 
+    function rimuoviRisultatiSottoalbero(prodotto) {
+        if (!prodotto) {
+            return;
+        }
+
+        const prodottoIds = new Set();
+        const skuIds = new Set();
+
+        const raccogli = (nodo) => {
+            if (!nodo || nodo.id == null) {
+                return;
+            }
+
+            prodottoIds.add(String(nodo.id));
+
+            if (Array.isArray(nodo.skuList)) {
+                nodo.skuList.forEach((sku) => {
+                    if (sku && sku.id != null) {
+                        skuIds.add(String(sku.id));
+                    }
+                });
+            }
+
+            if (Array.isArray(nodo.figli)) {
+                nodo.figli.forEach((figlio) => raccogli(figlio));
+            }
+        };
+
+        raccogli(prodotto);
+
+        let aggiunti;
+        do {
+            aggiunti = false;
+            stato.risultati.forEach((item) => {
+                if (item.categoria !== 'PRODOTTO' || item.id == null) {
+                    return;
+                }
+
+                const padreId = item.raw?.padreId;
+                if (padreId != null && prodottoIds.has(String(padreId))
+                    && !prodottoIds.has(String(item.id))) {
+                    prodottoIds.add(String(item.id));
+                    aggiunti = true;
+                }
+            });
+        } while (aggiunti);
+
+        stato.risultati = stato.risultati.filter((item) => {
+            if (item.categoria === 'PRODOTTO') {
+                return !prodottoIds.has(String(item.id));
+            }
+            if (item.categoria === 'SKU') {
+                return !skuIds.has(String(item.id));
+            }
+            return true;
+        });
+
+        if (stato.selezionato) {
+            const selezionatoId = String(stato.selezionato.id);
+            const selezionatoCategoria = stato.selezionato.categoria;
+            const rimosso = (selezionatoCategoria === 'PRODOTTO' && prodottoIds.has(selezionatoId))
+                || (selezionatoCategoria === 'SKU' && skuIds.has(selezionatoId));
+            if (rimosso) {
+                stato.selezionato = null;
+                stato.dettaglioCompleto = null;
+                renderDettaglioVuoto();
+            }
+        }
+
+        renderRisultati();
+    }
+
     function aggiornaRisultatoInLista(id, categoria, patch) {
         if (id == null || !categoria || !patch) {
             return;
@@ -387,6 +459,7 @@ window.ricercaPage = (function () {
     return {
         init,
         rimuoviRisultatoDaLista,
+        rimuoviRisultatiSottoalbero,
         aggiornaRisultatoInLista,
         mostraMessaggioRicerca
     };

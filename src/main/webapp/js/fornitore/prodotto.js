@@ -25,6 +25,15 @@ window.prodottoPage = (function () {
         window.appFornitore.mostraMessaggioHome(testo, tipo);
     }
 
+    function aggiornaRisultatoRicerca(prodottoId, patch) {
+        if (window.appFornitore.getSezioneCorrente?.() !== 'ricerca') {
+            return;
+        }
+        if (window.ricercaPage && typeof window.ricercaPage.aggiornaRisultatoInLista === 'function') {
+            window.ricercaPage.aggiornaRisultatoInLista(prodottoId, 'PRODOTTO', patch);
+        }
+    }
+
     async function init() {
         // Cache dei riferimenti ai nodi DOM e caricamento iniziale dei dati disponibili.
         formProdottoSemplice = document.getElementById('form-crea-semplice');
@@ -372,6 +381,8 @@ window.prodottoPage = (function () {
         }
 
         const mostraMessaggio = mostraMessaggioGlobale;
+        const inRicerca = window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+            || container?.id === 'ricerca-dettaglio';
 
         if (!prodotto) {
             container.innerHTML = '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
@@ -390,6 +401,7 @@ window.prodottoPage = (function () {
         wrapper.appendChild(
             creaRigaCampoProdotto('Nome', prodotto.nome, async (nuovoValore) => {
                 const aggiornato = await aggiornaCampoProdotto(prodotto.id, 'nome', nuovoValore);
+                aggiornaRisultatoRicerca(prodotto.id, { nome: nuovoValore });
                 mostraDettaglioProdottoCreato(
                     aggiornato || { ...prodotto, nome: nuovoValore },
                     container
@@ -446,13 +458,28 @@ window.prodottoPage = (function () {
             }
 
             try {
+                let sottoalberoRicerca = null;
+                if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+                    && prodotto.tipo === 'COMPOSTO') {
+                    try {
+                        sottoalberoRicerca = await caricaDettaglioProdotto(prodotto.id, prodotto.tipo);
+                    } catch (erroreCaricamento) {
+                        console.warn('[prodotto.js] impossibile caricare sottoalbero prima eliminazione:', erroreCaricamento);
+                    }
+                }
+
                 await eliminaOggetto(prodotto.id, prodotto.tipo);
 
-                if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+                if (inRicerca
+                    && window.ricercaPage
+                    && prodotto.tipo === 'COMPOSTO'
+                    && typeof window.ricercaPage.rimuoviRisultatiSottoalbero === 'function') {
+                     window.ricercaPage.rimuoviRisultatiSottoalbero(sottoalberoRicerca || prodotto);
+                } else if (inRicerca
                     && window.ricercaPage
                     && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
-                    window.ricercaPage.rimuoviRisultatoDaLista(prodotto.id, 'PRODOTTO');
-                }
+                     window.ricercaPage.rimuoviRisultatoDaLista(prodotto.id, 'PRODOTTO');
+                 }
 
                 mostraMessaggio('Prodotto eliminato con successo.', 'success');
 
@@ -590,6 +617,8 @@ window.prodottoPage = (function () {
         card.style.marginTop = '0.75rem';
 
         const mostraMessaggio = mostraMessaggioGlobale;
+        const inRicerca = window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+            || container?.id === 'ricerca-dettaglio';
 
         card.appendChild(
             creaRigaCampoProdotto('Nome', nodo.nome, async (nuovoValore) => {
