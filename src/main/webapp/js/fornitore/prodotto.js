@@ -1617,91 +1617,6 @@ window.prodottoPage = (function () {
 
         renderBuilder();
     }
-
-    async function aggiungiFiglioEsistente(nodeClientId) {
-        const nodo = trovaNodoBuilder(builderState, nodeClientId);
-        if (!nodo || nodo.tipo !== 'COMPOSTO') {
-            return;
-        }
-
-        const candidati = prodottiDisponibiliCache.filter((prodotto) => {
-            if (!prodotto || prodotto.id == null) {
-                return false;
-            }
-
-            // Un prodotto esistente è selezionabile solo se non ha già un padre.
-            if (prodotto.padreId != null) {
-                return false;
-            }
-
-            // Inoltre non deve essere già presente nel builder corrente.
-            return !esisteProdottoConIdNelBuilder(builderState, prodotto.id);
-        });
-
-        if (!candidati.length) {
-            window.appFornitore.mostraMessaggioHome(
-                'Non ci sono prodotti top-level disponibili da aggiungere.',
-                'error'
-            );
-            return;
-        }
-
-        const elenco = candidati
-            .map((prodotto) => `${prodotto.id} - ${prodotto.nome} - ${prodotto.codice} - ${prodotto.tipo}`)
-            .join('\n');
-
-        const scelta = window.prompt(
-            `Inserisci l'id del prodotto esistente da collegare:\n\n${elenco}`
-        );
-
-        if (scelta === null) {
-            return;
-        }
-
-        const selezionato = candidati.find(
-            (prodotto) => String(prodotto.id) === String(scelta.trim())
-        );
-
-        if (!selezionato) {
-            window.appFornitore.mostraMessaggioHome(
-                'Prodotto selezionato non valido.',
-                'error'
-            );
-            return;
-        }
-
-        try {
-            const prodottoCompleto = await caricaDettaglioProdotto(
-                selezionato.id,
-                selezionato.tipo
-            );
-
-            // Carichiamo l'albero completo del prodotto esistente così il builder mostra
-            // davvero tutti i suoi discendenti già presenti a database.
-            const nodoEsistente = mappaProdottoEsistentePerBuilder(prodottoCompleto);
-
-            if (!nodoEsistente) {
-                window.appFornitore.mostraMessaggioHome(
-                    'Impossibile aggiungere il prodotto selezionato.',
-                    'error'
-                );
-                return;
-            }
-
-            // Aggiungiamo al builder un riferimento reale al prodotto esistente.
-            // Più avanti sistemeremo la servlet per ignorare i figli in persistenza
-            // quando il nodo ha già un id, usandoli solo per la visualizzazione.
-            nodo.figli.push(nodoEsistente);
-            renderBuilder();
-        } catch (error) {
-            console.error('[prodotto.js] errore aggiunta prodotto esistente:', error);
-            window.appFornitore.mostraMessaggioHome(
-                error.message || 'Errore durante il caricamento del prodotto esistente.',
-                'error'
-            );
-        }
-    }
-
     function aggiungiSkuEsistente(nodeClientId) {
         // Associa al semplice corrente una SKU già esistente a catalogo.
         const nodo = trovaNodoBuilder(builderState, nodeClientId);
@@ -2121,25 +2036,6 @@ window.prodottoPage = (function () {
 
         return false;
     }
-
-    function esisteProdottoConIdNelBuilder(nodo, idProdotto) {
-        if (!nodo || idProdotto == null) {
-            return false;
-        }
-
-        if (nodo.id != null && Number(nodo.id) === Number(idProdotto)) {
-            return true;
-        }
-
-        if (nodo.tipo === 'COMPOSTO' && Array.isArray(nodo.figli)) {
-            return nodo.figli.some((figlio) =>
-                esisteProdottoConIdNelBuilder(figlio, idProdotto)
-            );
-        }
-
-        return false;
-    }
-
     function nextBuilderNodeId() {
         builderNodeSeq += 1;
         return `builder-node-${builderNodeSeq}`;
@@ -2267,13 +2163,8 @@ window.prodottoPage = (function () {
     return {
         init,
         aggiornaListaSku,
-        caricaProdottiDisponibili,
         caricaSkuDisponibili,
-        mostraDettaglioProdottoCreato,
         renderDettaglioProdottoInContainer,
-        getProdottiDisponibili() {
-            return [...prodottiDisponibiliCache];
-        }
     };
 })();
 

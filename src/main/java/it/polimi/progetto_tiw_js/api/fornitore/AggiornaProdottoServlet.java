@@ -20,13 +20,16 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
+        // Accesso consentito solo al fornitore autenticato.
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
+        // Lettura parametri richiesti per aggiornare un campo.
         String idParam = req.getParameter("id");
         String campo = req.getParameter("campo");
         String valore = req.getParameter("valore");
 
+        // Validazione base della richiesta.
         if (isBlank(idParam) || isBlank(campo) || valore == null) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Parametri mancanti");
             return;
@@ -40,6 +43,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
             return;
         }
 
+        // Id non valido o non positivo: blocchiamo l'operazione.
         if (id <= 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Id non valido");
             return;
@@ -49,21 +53,26 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
             ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
             Prodotto prodotto = prodottoDAO.findById(id);
 
+            // Se il prodotto non esiste, non possiamo aggiornarlo.
             if (prodotto == null) {
                 sendError(resp, HttpServletResponse.SC_NOT_FOUND, "Prodotto non trovato");
                 return;
             }
 
+            // Normalizziamo il tipo per vincolare i campi aggiornabili.
             String tipoProdotto = prodotto.getTipo() == null
                     ? ""
                     : prodotto.getTipo().trim().toUpperCase();
 
+            // Normalizzazione del campo da aggiornare.
             String campoPulito = campo.trim().toLowerCase();
 
+            // Applichiamo l'aggiornamento con le relative validazioni.
             switch (campoPulito) {
                 case "nome" -> {
                     String nome = valore.trim();
 
+                    // Nome obbligatorio.
                     if (nome.isBlank()) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il nome non può essere vuoto");
@@ -83,6 +92,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                         return;
                     }
 
+                    // Codice non negativo e univoco.
                     if (codice < 0) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il codice deve essere maggiore o uguale a 0");
@@ -99,6 +109,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                 }
 
                 case "descrizione" -> {
+                    // La descrizione è modificabile solo per i composti.
                     if (!"COMPOSTO".equals(tipoProdotto)) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "La descrizione è modificabile solo per i prodotti composti");
@@ -107,6 +118,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
 
                     String descrizione = valore.trim();
 
+                    // Descrizione obbligatoria.
                     if (descrizione.isBlank()) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "La descrizione non può essere vuota");
@@ -117,6 +129,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                 }
 
                 case "prezzomin" -> {
+                    // Prezzo minimo valido solo per i composti.
                     if (!"COMPOSTO".equals(tipoProdotto)) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il prezzo minimo è modificabile solo per i prodotti composti");
@@ -132,6 +145,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                         return;
                     }
 
+                    // Range prezzo minimo coerente.
                     if (prezzoMin < 0) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il prezzo minimo deve essere maggiore o uguale a 0");
@@ -148,6 +162,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                 }
 
                 case "prezzomax" -> {
+                    // Prezzo massimo valido solo per i composti.
                     if (!"COMPOSTO".equals(tipoProdotto)) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il prezzo massimo è modificabile solo per i prodotti composti");
@@ -163,6 +178,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                         return;
                     }
 
+                    // Range prezzo massimo coerente.
                     if (prezzoMax < 0) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il prezzo massimo deve essere maggiore o uguale a 0");
@@ -179,12 +195,14 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                 }
 
                 default -> {
+                    // Campo non gestito dal backend.
                     sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                             "Campo non aggiornabile");
                     return;
                 }
             }
 
+            // Ricarico del prodotto aggiornato per restituire un JSON coerente.
             Prodotto prodottoAggiornato;
             if ("SEMPLICE".equals(tipoProdotto)) {
                 prodottoAggiornato = prodottoDAO.findByIdConSKU(id);
@@ -192,12 +210,14 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                 prodottoAggiornato = prodottoDAO.findByIdConDiscendenti(id);
             }
 
+            // Se il prodotto non si riesce a ricaricare, segnaliamo errore.
             if (prodottoAggiornato == null) {
                 sendError(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                         "Impossibile ricaricare il prodotto aggiornato");
                 return;
             }
 
+            // Risposta JSON con il prodotto aggiornato.
             sendJson(resp, prodottoAggiornato);
 
         } catch (SQLException e) {

@@ -16,8 +16,9 @@ import java.sql.SQLException;
  *
  * Questa servlet viene usata sia nella home del fornitore sia nella ricerca:
  * - per un prodotto semplice serve anche la lista delle SKU associate;
- * - per un prodotto composto serve l'intero sottoalbero dei figli.
+ * - per un prodotto composto serve l'intero sotto-albero dei figli.
  */
+
 @WebServlet("/apifornitoreprodotto-dettaglio")
 public class GetDettaglioProdottoServlet extends BaseApiServlet {
 

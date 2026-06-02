@@ -30,17 +30,22 @@ public class AggiornaSKUServlet extends BaseApiServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
+        // Accesso consentito solo al fornitore autenticato.
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
+        // Normalizziamo l'encoding per evitare problemi sui campi testuali.
         req.setCharacterEncoding("UTF-8");
 
+        // Verifichiamo se la richiesta e' multipart (necessario per la fotografia).
         boolean multipart = isMultipart(req);
 
+        // Lettura parametri: da multipart o da form-urlencoded.
         String idParam = multipart ? leggiCampoTestuale(req, "id") : req.getParameter("id");
         String campo = multipart ? leggiCampoTestuale(req, "campo") : req.getParameter("campo");
         String valore = multipart ? leggiCampoTestuale(req, "valore") : req.getParameter("valore");
 
+        // Validazione base della richiesta.
         if (isBlank(idParam) || isBlank(campo) || (valore == null && !"fotografia".equalsIgnoreCase(campo))) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Parametri mancanti");
             return;
@@ -54,6 +59,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
             return;
         }
 
+        // Id non valido o non positivo: blocchiamo l'operazione.
         if (id <= 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Id non valido");
             return;
@@ -63,17 +69,21 @@ public class AggiornaSKUServlet extends BaseApiServlet {
             SKUDAO skuDAO = new SKUDAO(conn);
             SKU sku = skuDAO.findById(id);
 
+            // La SKU deve esistere per poterla aggiornare.
             if (sku == null) {
                 sendError(resp, HttpServletResponse.SC_NOT_FOUND, "SKU non trovata");
                 return;
             }
 
+            // Normalizzazione del campo da aggiornare.
             String campoPulito = campo.trim();
 
+            // Aggiorniamo il campo richiesto con le relative validazioni.
             switch (campoPulito) {
                 case "nome" -> {
                     String nome = valore.trim();
 
+                    // Nome obbligatorio.
                     if (nome.isBlank()) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il nome non può essere vuoto");
@@ -86,6 +96,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
                 case "descrizioneTecnica" -> {
                     String descrizione = valore.trim();
 
+                    // Descrizione tecnica obbligatoria.
                     if (descrizione.isBlank()) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "La descrizione tecnica non può essere vuota");
@@ -106,6 +117,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
                         return;
                     }
 
+                    // Prezzo non negativo.
                     if (prezzo < 0) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il prezzo deve essere maggiore o uguale a 0");
@@ -126,6 +138,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
                         return;
                     }
 
+                    // Codice non negativo e univoco.
                     if (codice < 0) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Il codice deve essere maggiore o uguale a 0");
@@ -142,6 +155,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
                 }
 
                 case "fotografia" -> {
+                    // La fotografia richiede sempre una richiesta multipart.
                     if (!multipart) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Upload fotografia non valido");
@@ -150,12 +164,14 @@ public class AggiornaSKUServlet extends BaseApiServlet {
 
                     Part fotoPart = req.getPart("fotografia");
 
+                    // Il file deve essere presente e non vuoto.
                     if (fotoPart == null || fotoPart.getSize() == 0) {
                         sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                                 "Fotografia mancante");
                         return;
                     }
 
+                    // Salvataggio su disco e aggiornamento del path.
                     String fotografia = salvaFoto(fotoPart);
                     if (fotografia == null) {
                         sendError(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
@@ -167,12 +183,14 @@ public class AggiornaSKUServlet extends BaseApiServlet {
                 }
 
                 default -> {
+                    // Campo non gestito dal backend.
                     sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                             "Campo non aggiornabile");
                     return;
                 }
             }
 
+            // Ricarico la SKU aggiornata per restituire un JSON coerente.
             SKU skuAggiornata = skuDAO.findById(id);
             sendJson(resp, skuAggiornata);
 
@@ -186,6 +204,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
     }
 
     private boolean isMultipart(HttpServletRequest req) {
+        // Il content-type multipart indica un upload (es. fotografia).
         String contentType = req.getContentType();
         return contentType != null && contentType.toLowerCase().startsWith("multipart/");
     }
@@ -197,6 +216,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
             return null;
         }
 
+        // Lettura del contenuto testuale dal part multipart.
         byte[] contenuto = part.getInputStream().readAllBytes();
         return new String(contenuto, StandardCharsets.UTF_8);
     }
@@ -207,6 +227,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
             return null;
         }
 
+        // Supporto sia a path Unix che Windows.
         int slash = submitted.lastIndexOf('/');
         int backslash = submitted.lastIndexOf('\\');
         int indice = Math.max(slash, backslash);
@@ -216,6 +237,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
 
     private String salvaFoto(Part part) {
         try {
+            // Nome file originale e pulizia del path.
             String nomeOriginale = estraiNomeFile(part);
 
             if (isBlank(nomeOriginale)) {
@@ -227,8 +249,10 @@ public class AggiornaSKUServlet extends BaseApiServlet {
             int punto = nomePulito.lastIndexOf('.');
             String estensione = punto >= 0 ? nomePulito.substring(punto) : "";
 
+            // Generazione nome file unico.
             String nomeGenerato = "sku_" + System.currentTimeMillis() + estensione;
 
+            // Recupero cartella uploads dell'applicazione.
             String uploadDirPath = getServletContext().getRealPath("/uploads");
             if (uploadDirPath == null) {
                 return null;
@@ -239,6 +263,7 @@ public class AggiornaSKUServlet extends BaseApiServlet {
                 return null;
             }
 
+            // Scrittura su disco e ritorno del path relativo.
             String filePathAssoluto = uploadDir.getAbsolutePath() + File.separator + nomeGenerato;
             part.write(filePathAssoluto);
 

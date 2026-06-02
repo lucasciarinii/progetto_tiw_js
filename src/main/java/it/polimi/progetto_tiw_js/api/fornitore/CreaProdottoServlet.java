@@ -72,10 +72,12 @@ public class CreaProdottoServlet extends BaseApiServlet {
     private void gestisciCreazioneDaParametri(HttpServletRequest req, HttpServletResponse resp)
             throws SQLException, IOException {
 
+        // Lettura parametri base del form.
         String tipo = req.getParameter("tipo");
         String codiceParam = req.getParameter("codice");
         String nome = req.getParameter("nome");
 
+        // Validazione parametri obbligatori.
         if (isBlank(tipo) || isBlank(codiceParam) || isBlank(nome)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametri obbligatori mancanti");
@@ -90,6 +92,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return;
         }
 
+        // Codice non negativo.
         if (codice < 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Il codice deve essere maggiore o uguale a 0");
@@ -98,6 +101,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
 
         ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
 
+        // Verifica univocita' del codice prodotto.
         if (prodottoDAO.existsByCodice(codice)) {
             sendError(resp, HttpServletResponse.SC_CONFLICT,
                     "Esiste già un prodotto con questo codice");
@@ -106,6 +110,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
 
         String tipoPulito = normalize(tipo);
 
+        // Smistamento in base al tipo richiesto.
         if ("SEMPLICE".equals(tipoPulito)) {
             creaProdottoSemplice(req, resp, prodottoDAO, codice, nome.trim());
             return;
@@ -128,6 +133,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
                                       ProdottoDAO prodottoDAO, int codice, String nome)
             throws SQLException, IOException {
 
+        // Le SKU sono obbligatorie per un semplice.
         String[] skuIdParams = req.getParameterValues("skuIds");
 
         if (skuIdParams == null || skuIdParams.length == 0) {
@@ -138,6 +144,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
 
         List<Integer> skuIds = new ArrayList<>();
 
+        // Validazione e parsing degli id SKU selezionati.
         for (String skuIdParam : skuIdParams) {
             try {
                 skuIds.add(Integer.parseInt(skuIdParam.trim()));
@@ -148,12 +155,14 @@ public class CreaProdottoServlet extends BaseApiServlet {
             }
         }
 
+        // Creazione prodotto e associazione delle SKU.
         int prodottoId = prodottoDAO.createProdottoSemplice(codice, nome);
 
         for (Integer skuId : skuIds) {
             prodottoDAO.addSKUToProdotto(prodottoId, skuId);
         }
 
+        // Ritorniamo il dettaglio completo appena creato.
         Prodotto prodottoCreato = prodottoDAO.findByIdConSKU(prodottoId);
         sendJson(resp, prodottoCreato);
     }
@@ -166,17 +175,20 @@ public class CreaProdottoServlet extends BaseApiServlet {
                                           ProdottoDAO prodottoDAO, int codice, String nome)
             throws SQLException, IOException {
 
+        // Lettura parametri specifici del composto.
         String descrizione = req.getParameter("descrizione");
         String prezzoMinParam = req.getParameter("prezzoMin");
         String prezzoMaxParam = req.getParameter("prezzoMax");
         String[] figlioIdParams = req.getParameterValues("figlioIds");
 
+        // Validazione campi obbligatori.
         if (isBlank(descrizione) || isBlank(prezzoMinParam) || isBlank(prezzoMaxParam)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Compila tutti i campi del prodotto composto");
             return;
         }
 
+        // Deve avere almeno un sottoprodotto.
         if (figlioIdParams == null || figlioIdParams.length == 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Seleziona almeno un sottoprodotto");
@@ -195,6 +207,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return;
         }
 
+        // Validazione fascia di prezzo.
         if (prezzoMin < 0 || prezzoMax < 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "I prezzi devono essere maggiori o uguali a 0");
@@ -209,6 +222,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
 
         Set<Integer> figlioIds = new LinkedHashSet<>();
 
+        // Parsing degli id figli selezionati.
         for (String figlioIdParam : figlioIdParams) {
             try {
                 figlioIds.add(Integer.parseInt(figlioIdParam.trim()));
@@ -229,12 +243,14 @@ public class CreaProdottoServlet extends BaseApiServlet {
                 return;
             }
 
+            // Il figlio deve essere top-level (senza padre).
             if (figlio.getPadreId() != null) {
                 sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                         "Uno dei sottoprodotti selezionati ha già un padre");
                 return;
             }
 
+            // Controllo profondita' massima del sottoalbero.
             int altezzaSottoalbero = prodottoDAO.getSubtreeHeight(figlioId);
             if (altezzaSottoalbero + 1 > MAX_PROFONDITA) {
                 sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
@@ -243,6 +259,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             }
         }
 
+        // Creazione del composto e collegamento dei figli.
         int prodottoId = prodottoDAO.createProdottoComposto(
                 codice,
                 nome,
@@ -255,6 +272,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             prodottoDAO.setPadre(figlioId, prodottoId);
         }
 
+        // Restituiamo il composto con i discendenti caricati.
         Prodotto prodottoCreato = prodottoDAO.findByIdConDiscendenti(prodottoId);
         sendJson(resp, prodottoCreato);
     }
@@ -273,6 +291,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
     private void gestisciCreazioneCompostoDaJson(HttpServletRequest req, HttpServletResponse resp)
             throws SQLException, IOException {
 
+        // Parsing del payload JSON del builder.
         BuilderProdottoDto root = gson.fromJson(req.getReader(), BuilderProdottoDto.class);
 
         if (root == null) {
@@ -281,12 +300,14 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return;
         }
 
+        // Il builder deve inviare sempre un composto come radice.
         if (!"COMPOSTO".equals(normalize(root.tipo))) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Il payload JSON deve rappresentare un prodotto composto");
             return;
         }
 
+        // Validazione preliminare dell'albero.
         String errore = validaNodoBuilder(root, 1);
         if (errore != null) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, errore);
@@ -303,11 +324,13 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return;
         }
 
+        // Raccogliamo gli id presenti nel payload per validare le eliminazioni.
         Set<Integer> prodottiNelPayload = new HashSet<>();
         Set<Integer> skuNelPayload = new HashSet<>();
         raccogliIdProdottiNelPayload(root, prodottiNelPayload);
         raccogliIdSkuNelPayload(root, skuNelPayload);
 
+        // Verifica coerenza eliminazioni vs nodi presenti nel payload.
         String erroreEliminazioni = validaEliminazioni(root, prodottiNelPayload, skuNelPayload);
         if (erroreEliminazioni != null) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, erroreEliminazioni);
@@ -317,10 +340,12 @@ public class CreaProdottoServlet extends BaseApiServlet {
         boolean autoCommitPrecedente = conn.getAutoCommit();
 
         try {
+            // Applichiamo prima le eliminazioni richieste dal builder.
             applicaEliminazioni(root, prodottoDAO, skuDAO);
 
             conn.setAutoCommit(false);
 
+            // Persistiamo l'albero del builder e otteniamo l'id della radice.
             int rootId = persistiNodoBuilder(root, null, prodottoDAO);
 
             conn.commit();
@@ -344,6 +369,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
     private void applicaEliminazioni(BuilderProdottoDto root, ProdottoDAO prodottoDAO, SKUDAO skuDAO)
             throws SQLException, BusinessValidationException {
 
+        // Eliminazione prodotti richiesti dal builder.
         if (root.eliminaProdotti != null) {
             Set<Integer> prodottiDaEliminare = new LinkedHashSet<>(root.eliminaProdotti);
             for (Integer prodottoId : prodottiDaEliminare) {
@@ -355,6 +381,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             }
         }
 
+        // Eliminazione SKU richieste dal builder (con vincoli di coerenza).
         if (root.eliminaSku != null) {
             Set<Integer> skuDaEliminare = new LinkedHashSet<>(root.eliminaSku);
             for (Integer skuId : skuDaEliminare) {
@@ -366,6 +393,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
                     throw new BusinessValidationException("SKU da eliminare non trovata");
                 }
 
+                // Non possiamo eliminare una SKU che lascerebbe un semplice senza SKU.
                 if (prodottoDAO.existsProdottoSempliceCheResterebbeSenzaSku(skuId)) {
                     throw new BusinessValidationException(
                             "Non puoi eliminare la SKU " + skuId + " perché lascerebbe senza SKU almeno un prodotto"
@@ -381,6 +409,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
                                       Set<Integer> prodottiNelPayload,
                                       Set<Integer> skuNelPayload) {
 
+        // Non si puo' eliminare un prodotto ancora presente nell'albero JSON.
         if (root.eliminaProdotti != null) {
             for (Integer prodottoId : root.eliminaProdotti) {
                 if (prodottoId != null && prodottiNelPayload.contains(prodottoId)) {
@@ -389,6 +418,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             }
         }
 
+        // Non si puo' eliminare una SKU ancora presente nel payload.
         if (root.eliminaSku != null) {
             for (Integer skuId : root.eliminaSku) {
                 if (skuId != null && skuNelPayload.contains(skuId)) {
@@ -405,6 +435,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return;
         }
 
+        // Raccogliamo gli id dei prodotti gia' esistenti referenziati nel JSON.
         if (nodo.id != null) {
             ids.add(nodo.id);
         }
@@ -426,6 +457,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return;
         }
 
+        // Raccogliamo gli id delle SKU gia' esistenti nel payload.
         for (BuilderSkuDto sku : nodo.skuList) {
             if (sku != null && sku.id != null) {
                 ids.add(sku.id);
@@ -441,6 +473,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
     private int persistiNodoBuilder(BuilderProdottoDto nodo, Integer padreId, ProdottoDAO prodottoDAO)
             throws SQLException, BusinessValidationException {
 
+        // Smistamento in base al tipo del nodo.
         String tipo = normalize(nodo.tipo);
 
         if ("SEMPLICE".equals(tipo)) {
@@ -475,6 +508,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
                 throw new BusinessValidationException("Il prodotto referenziato non è di tipo semplice");
             }
 
+            // Verifica coerenza del padre attuale con il nuovo padre richiesto.
             Integer padreAttuale = esistente.getPadreId();
             if (padreAttuale != null && (padreId == null || !padreAttuale.equals(padreId))) {
                 throw new BusinessValidationException("Un prodotto semplice selezionato ha già un padre");
@@ -508,6 +542,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
         Set<Integer> skuDaAssociare = new LinkedHashSet<>();
         SKUDAO skuDAO = new SKUDAO(conn);
 
+        // Risolviamo le SKU: o gia' esistenti o nuove da creare.
         for (BuilderSkuDto skuDto : nodo.skuList) {
             Integer skuIdDaAssociare;
 
@@ -523,6 +558,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             skuDaAssociare.add(skuIdDaAssociare);
         }
 
+        // Se il prodotto e' nuovo, inseriamo tutte le associazioni.
         if (prodottoNuovo) {
             for (Integer skuId : skuDaAssociare) {
                 prodottoDAO.addSKUToProdotto(sempliceId, skuId);
@@ -530,6 +566,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
             return sempliceId;
         }
 
+        // Se il prodotto esiste, riallineiamo le SKU (rimuovi non presenti, aggiungi nuove).
         List<Integer> skuAttuali = prodottoDAO.findSkuIdsForProduct(sempliceId);
         Set<Integer> skuAttualiSet = new LinkedHashSet<>(skuAttuali);
 
@@ -569,11 +606,13 @@ public class CreaProdottoServlet extends BaseApiServlet {
                 throw new BusinessValidationException("Il prodotto referenziato non è di tipo composto");
             }
 
+            // Verifica coerenza del padre attuale con il nuovo padre richiesto.
             Integer padreAttuale = esistente.getPadreId();
             if (padreAttuale != null && (padreId == null || !padreAttuale.equals(padreId))) {
                 throw new BusinessValidationException("Un prodotto composto selezionato ha già un padre");
             }
 
+            // Se agganciamo un composto esistente a un padre, rispettiamo la profondita' massima.
             int altezzaSottoalbero = prodottoDAO.getSubtreeHeight(nodo.id);
             if (padreId != null && altezzaSottoalbero + 1 > MAX_PROFONDITA) {
                 throw new BusinessValidationException("Profondità massima superata");
@@ -602,6 +641,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
 
         Set<Integer> figliPersistiti = new LinkedHashSet<>();
         if (nodo.figli != null) {
+            // Persistiamo ricorsivamente i figli e teniamo traccia degli id risultanti.
             for (BuilderProdottoDto figlio : nodo.figli) {
                 int figlioId = persistiNodoBuilder(figlio, compostoId, prodottoDAO);
                 figliPersistiti.add(figlioId);
@@ -609,6 +649,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
         }
 
         if (prodottoEsistente) {
+            // Se il composto esisteva, rimuoviamo i figli non piu' presenti nel payload.
             List<Prodotto> figliAttuali = prodottoDAO.findFigliDiretti(compostoId);
             for (Prodotto figlio : figliAttuali) {
                 if (!figliPersistiti.contains(figlio.getId())) {
@@ -627,6 +668,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
     private int creaNuovaSkuDaBuilder(BuilderSkuDto skuDto, SKUDAO skuDAO)
             throws SQLException, BusinessValidationException {
 
+        // Codice SKU deve essere univoco.
         if (skuDAO.existsByCodice(skuDto.codice)) {
             throw new BusinessValidationException("Esiste già una SKU con codice " + skuDto.codice);
         }
@@ -663,10 +705,12 @@ public class CreaProdottoServlet extends BaseApiServlet {
 
         String tipo = normalize(nodo.tipo);
 
+        // Tipo ammesso solo semplice o composto.
         if (!"SEMPLICE".equals(tipo) && !"COMPOSTO".equals(tipo)) {
             return "Tipo prodotto non valido";
         }
 
+        // Validazioni comuni a tutti i tipi.
         if (isBlank(nodo.nome)) {
             return "Il nome del prodotto è obbligatorio";
         }
@@ -676,6 +720,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
         }
 
         if ("SEMPLICE".equals(tipo)) {
+            // Ogni semplice deve avere almeno una SKU.
             if (nodo.skuList == null || nodo.skuList.isEmpty()) {
                 return "Ogni prodotto semplice deve avere almeno una SKU";
             }
@@ -706,6 +751,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
         }
 
         if ("COMPOSTO".equals(tipo)) {
+            // Validazioni specifiche dei composti.
             if (isBlank(nodo.descrizione)) {
                 return "La descrizione del prodotto composto è obbligatoria";
             }
@@ -719,6 +765,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
                 return "Il prezzo minimo non può superare il massimo";
             }
 
+            // Ogni composto deve avere almeno un figlio.
             if (nodo.figli == null || nodo.figli.isEmpty()) {
                 return "Ogni prodotto composto deve avere almeno un sottoprodotto";
             }

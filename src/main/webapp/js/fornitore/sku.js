@@ -711,15 +711,6 @@ window.skuPage = (function () {
         return Number.isNaN(numero) ? '0.00' : numero.toFixed(2);
     }
 
-    // Escape minimo per evitare inserimenti HTML non voluti nel dettaglio.
-    function escapeHtml(valore) {
-        return String(valore ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-    }
 
     function risolviPercorsoFoto(fotografia) {
         const fotoPath = String(fotografia || '').trim();
@@ -741,12 +732,7 @@ window.skuPage = (function () {
     // API pubbliche del modulo.
     return {
         init,
-        caricaListaSku,
-        mostraDettaglioSku,
         renderDettaglioSkuInContainer,
-        getListaSku() {
-            return [...stato.listaSku];
-        }
     };
 })();
 
