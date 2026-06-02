@@ -18,11 +18,11 @@ import java.sql.SQLException;
 
 /**
  * Crea una nuova SKU e restituisce il dettaglio completo in JSON.
- *
+ *-
  * Nota:
- * qui la request arriva come multipart/form-data perché la form contiene
- * anche il campo file della fotografia. Anche se la foto è opzionale,
- * i campi testuali vanno comunque letti tramite Part.
+ * la richiesta arriva come multipart/form-data perché la form può contenere
+ * anche il file della fotografia. Per questo motivo, anche i campi testuali
+ * vengono letti tramite Part invece che con getParameter().
  */
 @WebServlet("/apifornitoreskucrea")
 @MultipartConfig
@@ -34,18 +34,22 @@ public class CreaSKUServlet extends BaseApiServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
+        // La creazione di SKU è permessa solo a un fornitore autenticato.
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
         req.setCharacterEncoding("UTF-8");
 
+        // Leggo i campi testuali della multipart.
         String codiceParam = leggiCampoTestuale(req, "codice");
         String nome = leggiCampoTestuale(req, "nome");
         String descrizioneTecnica = leggiCampoTestuale(req, "descrizioneTecnica");
         String prezzoParam = leggiCampoTestuale(req, "prezzo");
 
+        // La fotografia è opzionale.
         Part fotoPart = req.getPart("fotografia");
 
+        // Controllo dei campi obbligatori.
         if (isBlank(codiceParam) || isBlank(nome) || isBlank(descrizioneTecnica) || isBlank(prezzoParam)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Tutti i campi obbligatori devono essere compilati");
@@ -55,6 +59,7 @@ public class CreaSKUServlet extends BaseApiServlet {
         int codice;
         double prezzo;
 
+        // Parsing dei campi numerici.
         try {
             codice = Integer.parseInt(codiceParam.trim());
             prezzo = Double.parseDouble(prezzoParam.trim());
@@ -64,25 +69,28 @@ public class CreaSKUServlet extends BaseApiServlet {
             return;
         }
 
+        // Il codice non può essere negativo.
         if (codice < 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Il codice deve essere maggiore o uguale a 0");
             return;
         }
 
+        // Il prezzo non può essere negativo.
         if (prezzo < 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Il prezzo deve essere maggiore o uguale a 0");
             return;
         }
 
-        // Per ora la fotografia è opzionale.
-        // Se non c'è file caricato, resta null.
+        // Se non viene caricata nessuna immagine, il percorso resta null.
         String fotografia = null;
 
         if (fotoPart != null && fotoPart.getSize() > 0) {
             fotografia = salvaFoto(fotoPart);
 
+            // Se il file era presente ma il salvataggio fallisce,
+            // restituisco un errore interno.
             if (fotografia == null) {
                 sendError(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                         "Errore durante il salvataggio della fotografia");
@@ -93,6 +101,7 @@ public class CreaSKUServlet extends BaseApiServlet {
         try {
             SKUDAO skuDAO = new SKUDAO(conn);
 
+            // Il codice SKU deve essere univoco.
             if (skuDAO.existsByCodice(codice)) {
                 sendError(resp, HttpServletResponse.SC_CONFLICT,
                         "Esiste già una SKU con questo codice");
@@ -107,6 +116,7 @@ public class CreaSKUServlet extends BaseApiServlet {
                     prezzo
             );
 
+            // Rileggo la SKU completa dal DB e la restituisco al frontend.
             SKU skuCreata = skuDAO.findById(idGenerato);
             sendJson(resp, skuCreata);
 
@@ -116,7 +126,7 @@ public class CreaSKUServlet extends BaseApiServlet {
     }
 
     /**
-     * Legge un campo testuale da una request multipart.
+     * Legge un campo testuale da una request multipart e lo restituisce come stringa UTF-8.
      */
     private String leggiCampoTestuale(HttpServletRequest req, String nomeCampo)
             throws IOException, ServletException {
@@ -139,7 +149,8 @@ public class CreaSKUServlet extends BaseApiServlet {
             return null;
         }
 
-        // Difesa minima: alcuni browser/path vecchi possono includere cartelle.
+        // Difesa minima: alcuni browser o path vecchi possono includere
+        // anche la cartella completa, quindi tengo solo il nome finale.
         int slash = submitted.lastIndexOf('/');
         int backslash = submitted.lastIndexOf('\\');
         int indice = Math.max(slash, backslash);
@@ -147,9 +158,19 @@ public class CreaSKUServlet extends BaseApiServlet {
         return (indice >= 0) ? submitted.substring(indice + 1) : submitted;
     }
 
+    /**
+     * Utility per controllare stringhe nulle, vuote o fatte solo di spazi.
+     */
     private boolean isBlank(String valore) {
         return valore == null || valore.isBlank();
     }
+
+    /**
+     * Salva la fotografia della SKU nella cartella uploads dell'applicazione
+     * e restituisce il percorso relativo da memorizzare nel database.
+     *-
+     * Se qualcosa va storto, ritorna null.
+     */
     private String salvaFoto(Part part) {
         try {
             String nomeOriginale = estraiNomeFile(part);
@@ -158,11 +179,13 @@ public class CreaSKUServlet extends BaseApiServlet {
                 return null;
             }
 
+            // Ripulisco ancora il nome file e ne ricavo l'estensione.
             String nomePulito = Paths.get(nomeOriginale).getFileName().toString();
 
             int punto = nomePulito.lastIndexOf('.');
             String estensione = punto >= 0 ? nomePulito.substring(punto) : "";
 
+            // Genero un nome univoco semplice basato sul timestamp.
             String nomeGenerato = "sku_" + System.currentTimeMillis() + estensione;
 
             String uploadDirPath = getServletContext().getRealPath("/uploads");
@@ -170,6 +193,7 @@ public class CreaSKUServlet extends BaseApiServlet {
                 return null;
             }
 
+            // Se la cartella uploads non esiste, provo a crearla.
             File uploadDir = new File(uploadDirPath);
             if (!uploadDir.exists() && !uploadDir.mkdirs()) {
                 return null;

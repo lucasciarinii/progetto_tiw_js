@@ -24,6 +24,7 @@ public class EliminaOggettoServlet extends BaseApiServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
+        // L'eliminazione di oggetti è consentita solo a un fornitore autenticato.
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
@@ -31,10 +32,13 @@ public class EliminaOggettoServlet extends BaseApiServlet {
         String tipo = req.getParameter("tipo");
         String returnProdottoIdStr = req.getParameter("returnProdottoId");
 
+        // Tolleranza verso un possibile nome alternativo del parametro,
+        // utile se qualche chiamata frontend usa ancora "type".
         if (isBlank(tipo)) {
             tipo = req.getParameter("type");
         }
 
+        // I parametri minimi richiesti sono id e tipo.
         if (isBlank(idStr) || isBlank(tipo)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametri mancanti");
@@ -52,12 +56,14 @@ public class EliminaOggettoServlet extends BaseApiServlet {
             return;
         }
 
+        // L'id dell'oggetto da eliminare deve essere strettamente positivo.
         if (id <= 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametro id non valido");
             return;
         }
 
+        // Se presente, anche l'id del prodotto da ricaricare deve essere valido.
         if (returnProdottoId != null && returnProdottoId <= 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametro returnProdottoId non valido");
@@ -70,6 +76,7 @@ public class EliminaOggettoServlet extends BaseApiServlet {
             ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
             SKUDAO skuDAO = new SKUDAO(conn);
 
+            // Smistamento dell'eliminazione in base al tipo richiesto.
             switch (tipo) {
                 case "SKU" -> eliminaSku(resp, skuDAO, prodottoDAO, id, returnProdottoId);
                 case "SEMPLICE" -> eliminaProdottoSemplice(resp, prodottoDAO, id);
@@ -95,6 +102,8 @@ public class EliminaOggettoServlet extends BaseApiServlet {
             return;
         }
 
+        // Non posso eliminare una SKU se così facendo un prodotto semplice
+        // resterebbe senza nessuna SKU associata.
         if (prodottoDAO.existsProdottoSempliceCheResterebbeSenzaSku(skuId)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Non puoi eliminare questa SKU perché lascerebbe senza SKU almeno un prodotto semplice");
@@ -106,8 +115,8 @@ public class EliminaOggettoServlet extends BaseApiServlet {
         Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("ok", true);
 
-        // se il frontend ci dice da quale prodotto semplice siamo partiti,
-        // proviamo a rimandargli il dettaglio aggiornato già pronto
+        // Se il frontend ci passa anche il prodotto semplice di partenza,
+        // provo a restituire subito il dettaglio aggiornato già pronto.
         if (returnProdottoId != null) {
             Prodotto prodottoAggiornato = prodottoDAO.findByIdConSKU(returnProdottoId);
             if (prodottoAggiornato != null) {
@@ -129,12 +138,16 @@ public class EliminaOggettoServlet extends BaseApiServlet {
             return;
         }
 
+        // Controllo difensivo: il tipo richiesto dal client deve davvero
+        // corrispondere a un prodotto semplice.
         if (!"SEMPLICE".equalsIgnoreCase(prodotto.getTipo())) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Il tipo dell'oggetto non corrisponde a un prodotto semplice");
             return;
         }
 
+        // Se il prodotto semplice è figlio di un composto, non posso eliminarlo
+        // se è l'ultimo sottoprodotto rimasto sotto quel padre.
         if (prodotto.getPadreId() != null
                 && prodottoDAO.findFigliDiretti(prodotto.getPadreId()).size() <= 1) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
@@ -157,12 +170,16 @@ public class EliminaOggettoServlet extends BaseApiServlet {
             return;
         }
 
+        // Anche qui verifico che il tipo reale nel DB sia coerente
+        // con il tipo dichiarato nella richiesta.
         if (!"COMPOSTO".equalsIgnoreCase(prodotto.getTipo())) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Il tipo dell'oggetto non corrisponde a un prodotto composto");
             return;
         }
 
+        // Un composto figlio non può essere eliminato se è l'ultimo
+        // sottoprodotto rimasto del composto padre.
         if (prodotto.getPadreId() != null
                 && prodottoDAO.findFigliDiretti(prodotto.getPadreId()).size() <= 1) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
@@ -170,11 +187,14 @@ public class EliminaOggettoServlet extends BaseApiServlet {
             return;
         }
 
+        // Per un composto elimino ricorsivamente anche tutti i suoi discendenti.
         prodottoDAO.deleteProdottoConDiscendenti(id);
         sendJson(resp, createOkResponse());
     }
 
     private Object createOkResponse() {
+        // Questo oggetto anonimo viene usato solo per serializzare
+        // una risposta JSON minimale del tipo { "ok": true }.
         return new Object() {
             public final boolean ok = true;
         };

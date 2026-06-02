@@ -19,7 +19,7 @@ import java.util.Map;
 
 /**
  * Esegue la ricerca lato fornitore su prodotti e SKU.
- *
+ *-
  * Il frontend si aspetta un JSON del tipo:
  * {
  *   "keyword": "...",
@@ -36,12 +36,13 @@ public class RicercaProdottiServlet extends BaseApiServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        // accesso consentito solo al fornitore autenticato
+        // Endpoint accessibile solo a un fornitore autenticato.
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
         String keyword = req.getParameter("keyword");
 
+        // La ricerca ha senso solo se arriva una parola chiave non vuota.
         if (keyword == null || keyword.isBlank()) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Inserisci una parola chiave per cercare prodotti e SKU");
@@ -54,12 +55,12 @@ public class RicercaProdottiServlet extends BaseApiServlet {
             ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
             SKUDAO skuDAO = new SKUDAO(conn);
 
-            // prima recupero i prodotti base che matchano la keyword
+            // Recupero prima i prodotti che matchano la keyword in forma base.
             List<Prodotto> prodottiBase = prodottoDAO.searchByKeyword(keywordPulita);
             List<Prodotto> prodottiCompleti = new ArrayList<>();
 
-            // poi per ogni prodotto carico il dettaglio completo
-            // così il pannello di destra può mostrare tutto senza ambiguità
+            // Per ogni prodotto trovato carico poi il dettaglio completo,
+            // così il frontend ha già tutte le informazioni utili da mostrare.
             for (Prodotto prodottoBase : prodottiBase) {
                 if (prodottoBase == null) {
                     continue;
@@ -72,6 +73,8 @@ public class RicercaProdottiServlet extends BaseApiServlet {
                 } else if ("COMPOSTO".equalsIgnoreCase(prodottoBase.getTipo())) {
                     prodottoCompleto = prodottoDAO.findByIdConDiscendenti(prodottoBase.getId());
                 } else {
+                    // Caso difensivo: se il tipo non è riconosciuto,
+                    // restituisco comunque il prodotto base trovato.
                     prodottoCompleto = prodottoBase;
                 }
 
@@ -80,8 +83,8 @@ public class RicercaProdottiServlet extends BaseApiServlet {
                 }
             }
 
-            // stessa logica anche per le SKU: la keyword viene passata pulita,
-            // eventuali wildcard le gestisce il DAO
+            // Anche per le SKU uso la keyword già ripulita.
+            // L'eventuale logica di wildcard o LIKE resta nel DAO.
             List<SKU> risultatiSku = skuDAO.searchByKeyword(keywordPulita);
 
             Map<String, Object> risultato = new HashMap<>();

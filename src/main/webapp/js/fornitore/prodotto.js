@@ -617,8 +617,6 @@ window.prodottoPage = (function () {
         card.style.marginTop = '0.75rem';
 
         const mostraMessaggio = mostraMessaggioGlobale;
-        const inRicerca = window.appFornitore.getSezioneCorrente?.() === 'ricerca'
-            || container?.id === 'ricerca-dettaglio';
 
         card.appendChild(
             creaRigaCampoProdotto('Nome', nodo.nome, async (nuovoValore) => {
@@ -1068,10 +1066,6 @@ window.prodottoPage = (function () {
             })
         );
 
-        const codice = document.createElement('p');
-        codice.innerHTML = `Codice: ${escapeHtml(builderState.codice)}`;
-        wrapper.appendChild(codice);
-
         const tipo = document.createElement('p');
         tipo.innerHTML = 'Tipo: COMPOSTO';
         wrapper.appendChild(tipo);
@@ -1267,122 +1261,38 @@ window.prodottoPage = (function () {
     }
 
     function creaRigaCampoProdotto(etichetta, valoreIniziale, onSalva) {
-        const riga = document.createElement('p');
-
-        const label = document.createElement('strong');
-        label.textContent = `${etichetta}: `;
-        riga.appendChild(label);
-
-        const spanValore = document.createElement('span');
-        spanValore.textContent = valoreIniziale || '-';
-        spanValore.style.cursor = 'pointer';
-        spanValore.title = 'Clicca per modificare';
-        riga.appendChild(spanValore);
-
-        spanValore.addEventListener('click', () => {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = valoreIniziale ?? '';
-            input.className = 'form-control';
-            input.style.maxWidth = '260px';
-
-            riga.replaceChild(input, spanValore);
-            input.focus();
-            if (typeof input.select === 'function') {
-                input.select();
-            }
-
-            let ripristinato = false;
-
-            input.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') {
-                    ripristinato = true;
-                    riga.replaceChild(spanValore, input);
-                }
-            });
-
-            input.addEventListener(
-                'blur',
-                async () => {
-                    if (ripristinato) {
-                        return;
-                    }
-
-                    const nuovoValore = input.value.trim();
-
-                    try {
-                        await onSalva(nuovoValore);
-                    } catch (error) {
-                        riga.replaceChild(spanValore, input);
-                    }
-                },
-                { once: true }
-            );
+        return creaRigaCampoEditabile({
+            etichetta,
+            valoreIniziale,
+            onSalva,
+            maxWidth: '260px'
         });
-
-        return riga;
     }
 
     function creaRigaCampoSku(etichetta, valoreIniziale, onSalva) {
-        const riga = document.createElement('p');
-        riga.style.margin = '0';
-
-        const label = document.createElement('strong');
-        label.textContent = `${etichetta}: `;
-        riga.appendChild(label);
-
-        const spanValore = document.createElement('span');
-        spanValore.textContent = valoreIniziale || '-';
-        spanValore.style.cursor = 'pointer';
-        spanValore.title = 'Clicca per modificare';
-        riga.appendChild(spanValore);
-
-        spanValore.addEventListener('click', () => {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = valoreIniziale ?? '';
-            input.className = 'form-control';
-            input.style.maxWidth = '220px';
-
-            riga.replaceChild(input, spanValore);
-            input.focus();
-            if (typeof input.select === 'function') {
-                input.select();
-            }
-
-            let ripristinato = false;
-
-            input.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') {
-                    ripristinato = true;
-                    riga.replaceChild(spanValore, input);
-                }
-            });
-
-            input.addEventListener(
-                'blur',
-                async () => {
-                    if (ripristinato) {
-                        return;
-                    }
-
-                    const nuovoValore = input.value.trim();
-
-                    try {
-                        await onSalva(nuovoValore);
-                    } catch (error) {
-                        riga.replaceChild(spanValore, input);
-                    }
-                },
-                { once: true }
-            );
+        return creaRigaCampoEditabile({
+            etichetta,
+            valoreIniziale,
+            onSalva,
+            maxWidth: '220px',
+            marginZero: true
         });
-
-        return riga;
     }
 
     function creaRigaBuilderRoot(etichetta, valoreIniziale, onSalva) {
+        return creaRigaCampoEditabile({
+            etichetta,
+            valoreIniziale,
+            onSalva,
+            maxWidth: '260px'
+        });
+    }
+
+    function creaRigaCampoEditabile({ etichetta, valoreIniziale, onSalva, maxWidth, marginZero }) {
         const riga = document.createElement('p');
+        if (marginZero) {
+            riga.style.margin = '0';
+        }
 
         const label = document.createElement('strong');
         label.textContent = `${etichetta}: `;
@@ -1399,7 +1309,7 @@ window.prodottoPage = (function () {
             input.type = 'text';
             input.value = valoreIniziale ?? '';
             input.className = 'form-control';
-            input.style.maxWidth = '260px';
+            input.style.maxWidth = maxWidth || '260px';
 
             riga.replaceChild(input, spanValore);
             input.focus();
@@ -2162,11 +2072,14 @@ window.prodottoPage = (function () {
 
     return {
         init,
-        aggiornaListaSku,
         caricaSkuDisponibili,
         renderDettaglioProdottoInContainer,
     };
 })();
+
+
+
+
 
 
 

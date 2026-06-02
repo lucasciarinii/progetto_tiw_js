@@ -14,9 +14,10 @@ import java.util.List;
 
 /**
  * Restituisce i prodotti attualmente disponibili per essere agganciati
- * come figli nel form di creazione di un prodotto composto.
- *
- * Lato frontend servono almeno id, nome, codice e tipo.
+ * come figli durante la creazione di un prodotto composto.
+ *-
+ * Al frontend basta ricevere i dati essenziali del prodotto,
+ * come id, nome, codice e tipo.
  */
 @WebServlet("/apifornitoreprodotti-disponibili")
 public class GetProdottiDisponibiliServlet extends BaseApiServlet {
@@ -27,15 +28,15 @@ public class GetProdottiDisponibiliServlet extends BaseApiServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        // controllo classico: serve sessione valida e ruolo fornitore
+        // Endpoint accessibile solo a un fornitore autenticato.
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
         try {
             ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
 
-            // recupero solo i prodotti che il frontend può proporre
-            // nella lista dei "figli disponibili"
+            // Recupero solo i prodotti che possono essere proposti
+            // nella lista dei figli disponibili lato frontend.
             List<Prodotto> prodottiDisponibili = prodottoDAO.findDisponibili();
 
             sendJson(resp, prodottiDisponibili);

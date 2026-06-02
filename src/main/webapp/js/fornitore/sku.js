@@ -1,16 +1,13 @@
 window.skuPage = (function () {
 
     // Stato locale del modulo SKU.
-    // Ci teniamo la lista completa delle SKU e l'eventuale SKU attualmente mostrata nel dettaglio.
+    // Ci teniamo la SKU attualmente mostrata nel dettaglio.
     const stato = {
-        listaSku: [],
         skuSelezionata: null
     };
 
     // Riferimenti ai principali elementi della pagina.
     let formCreaSku;
-    let listaSkuDisponibili;
-    let hintSkuVuote;
     let dettaglioContent;
 
     function mostraMessaggioGlobale(testo, tipo) {
@@ -27,79 +24,19 @@ window.skuPage = (function () {
     // Recupera gli elementi dal DOM, aggancia gli eventi e carica i dati iniziali.
     async function init() {
         formCreaSku = document.getElementById('form-crea-sku');
-        listaSkuDisponibili = document.getElementById('lista-sku-disponibili');
-        hintSkuVuote = document.getElementById('hint-sku-vuote');
         dettaglioContent = document.getElementById('dettaglio-content');
 
         if (formCreaSku) {
             formCreaSku.addEventListener('submit', onSubmitCreaSku);
         }
 
-        await caricaListaSku();
         renderMessaggioDettaglioVuoto();
     }
 
-    // Carica dal server l'elenco completo delle SKU.
-    // Questo elenco serve sia per il dettaglio sia per le checkbox del prodotto semplice.
-    async function caricaListaSku() {
-        try {
-            const response = await fetch('apifornitoresku', {
-                method: 'GET',
-                credentials: 'same-origin',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-
-            const data = await window.appFornitore.parseJsonResponse(response);
-            stato.listaSku = Array.isArray(data) ? data : [];
-
-            renderListaSkuCheckbox(stato.listaSku);
-
-            // Se il modulo prodotti è già attivo, gli passiamo la lista aggiornata delle SKU.
-            if (window.prodottoPage && typeof window.prodottoPage.aggiornaListaSku === 'function') {
-                window.prodottoPage.aggiornaListaSku(stato.listaSku);
-            }
-        } catch (error) {
-            console.error('[sku.js] errore caricamento SKU:', error);
-            window.appFornitore.mostraMessaggioHome(
-                error.message || 'Errore durante il caricamento delle SKU.',
-                'error'
-            );
+    async function aggiornaListaSkuProdotti() {
+        if (window.prodottoPage && typeof window.prodottoPage.caricaSkuDisponibili === 'function') {
+            await window.prodottoPage.caricaSkuDisponibili();
         }
-    }
-
-    // Disegna la lista di checkbox usata nella creazione del prodotto semplice.
-    function renderListaSkuCheckbox(lista) {
-        if (!listaSkuDisponibili || !hintSkuVuote) {
-            return;
-        }
-
-        listaSkuDisponibili.innerHTML = '';
-
-        if (!lista || lista.length === 0) {
-            hintSkuVuote.hidden = false;
-            return;
-        }
-
-        hintSkuVuote.hidden = true;
-
-        lista.forEach((sku) => {
-            const label = document.createElement('label');
-            label.className = 'checkbox-row';
-
-            const input = document.createElement('input');
-            input.type = 'checkbox';
-            input.name = 'skuIds';
-            input.value = sku.id;
-
-            const testo = document.createElement('span');
-            testo.textContent = `${sku.codice} - ${sku.nome} - €${formattaPrezzo(sku.prezzo)}`;
-
-            label.appendChild(input);
-            label.appendChild(testo);
-            listaSkuDisponibili.appendChild(label);
-        });
     }
 
     // Gestisce l'invio del form di creazione SKU.
@@ -126,7 +63,7 @@ window.skuPage = (function () {
             formCreaSku.reset();
             window.appFornitore.mostraMessaggioHome('SKU creata con successo.', 'success');
 
-            await caricaListaSku();
+            await aggiornaListaSkuProdotti();
 
             if (skuCreata && skuCreata.id) {
                 mostraDettaglioSku(skuCreata);
@@ -235,7 +172,7 @@ window.skuPage = (function () {
                 );
 
                 mostraMessaggioGlobale('SKU aggiornata con successo.', 'success');
-                await caricaListaSku();
+                await aggiornaListaSkuProdotti();
                 aggiornaRisultatoRicerca({ nome: nuovoValore });
                 renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
@@ -257,7 +194,7 @@ window.skuPage = (function () {
                 );
 
                 mostraMessaggioGlobale('SKU aggiornata con successo.', 'success');
-                await caricaListaSku();
+                await aggiornaListaSkuProdotti();
                 aggiornaRisultatoRicerca({ codice: Number(nuovoValore) });
                 renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
@@ -288,7 +225,7 @@ window.skuPage = (function () {
                 );
 
                 mostraMessaggioGlobale('SKU aggiornata con successo.', 'success');
-                await caricaListaSku();
+                await aggiornaListaSkuProdotti();
                 aggiornaRisultatoRicerca({ descrizioneTecnica: nuovoValore });
                 renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
@@ -311,7 +248,7 @@ window.skuPage = (function () {
                 );
 
                 mostraMessaggioGlobale('Prezzo aggiornato con successo.', 'success');
-                await caricaListaSku();
+                await aggiornaListaSkuProdotti();
                 aggiornaRisultatoRicerca({ prezzo: Number(nuovoValore) });
                 renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
@@ -351,10 +288,7 @@ window.skuPage = (function () {
                 container.innerHTML =
                     '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
 
-                await Promise.all([
-                    caricaListaSku(),
-                     window.prodottoPage?.caricaSkuDisponibili?.()
-                 ]);
+                await aggiornaListaSkuProdotti();
             } catch (error) {
                 console.error('[sku.js] errore eliminazione SKU:', error);
                 const messaggio = error.message || 'Errore durante l\'eliminazione della SKU.';
@@ -603,7 +537,7 @@ window.skuPage = (function () {
                 );
 
                 mostraMessaggioGlobale('Fotografia aggiornata con successo.', 'success');
-                await caricaListaSku();
+                await aggiornaListaSkuProdotti();
                 mostraDettaglioSku(stato.skuSelezionata);
             } catch (error) {
                 console.error('[sku.js] errore aggiornamento fotografia SKU:', error);
@@ -735,11 +669,3 @@ window.skuPage = (function () {
         renderDettaglioSkuInContainer,
     };
 })();
-
-
-
-
-
-
-
-
