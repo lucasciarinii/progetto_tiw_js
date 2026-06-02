@@ -34,6 +34,81 @@ window.prodottoPage = (function () {
         }
     }
 
+    function estraiProdottoAggiornato(risposta) {
+        // Il backend in alcuni casi restituisce direttamente il prodotto,
+        // in altri un wrapper con dentro il prodotto aggiornato.
+        if (!risposta) {
+            return null;
+        }
+
+        if (risposta.id != null && risposta.tipo) {
+            return risposta;
+        }
+
+        if (risposta.prodottoAggiornato && risposta.prodottoAggiornato.id != null) {
+            return risposta.prodottoAggiornato;
+        }
+
+        return null;
+    }
+
+    async function rerenderDaRisposta(risposta, prodottoPadreId, container) {
+        // Provo prima a usare direttamente quello che mi ha restituito il backend.
+        const prodottoAggiornato = estraiProdottoAggiornato(risposta);
+
+        if (prodottoAggiornato) {
+            mostraDettaglioProdottoCreato(prodottoAggiornato, container);
+            return;
+        }
+
+        // Se il backend non ha restituito nulla di utile, ricarico il padre.
+        await refreshContenitoreDaPadre(prodottoPadreId, container);
+    }
+
+    function creaHandlerUpdateProdotto({
+                                           prodottoId,
+                                           campo,
+                                           container,
+                                           prodottoFallback,
+                                           patchFallback,
+                                           afterSuccess
+                                       }) {
+        return async (nuovoValore) => {
+            const risposta = await aggiornaCampoProdotto(prodottoId, campo, nuovoValore);
+            const fallback = prodottoFallback
+                ? { ...prodottoFallback, ...patchFallback(nuovoValore) }
+                : null;
+
+            const prodottoAggiornato = estraiProdottoAggiornato(risposta) || fallback;
+
+            if (prodottoAggiornato) {
+                mostraDettaglioProdottoCreato(prodottoAggiornato, container);
+            } else {
+                await refreshContenitoreDaPadre(prodottoId, container);
+            }
+
+            if (typeof afterSuccess === 'function') {
+                await afterSuccess();
+            }
+        };
+    }
+
+    function aggiornaRisultatoRicercaSkuSeServe(skuId) {
+        if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+            && window.ricercaPage
+            && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
+            window.ricercaPage.rimuoviRisultatoDaLista(skuId, 'SKU');
+        }
+    }
+
+    function aggiornaRisultatoRicercaProdottoSeServe(prodottoId) {
+        if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
+            && window.ricercaPage
+            && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
+            window.ricercaPage.rimuoviRisultatoDaLista(prodottoId, 'PRODOTTO');
+        }
+    }
+
     async function init() {
         // Cache dei riferimenti ai nodi DOM e caricamento iniziale dei dati disponibili.
         formProdottoSemplice = document.getElementById('form-crea-semplice');
@@ -399,15 +474,24 @@ window.prodottoPage = (function () {
         wrapper.appendChild(titolo);
 
         wrapper.appendChild(
-            creaRigaCampoProdotto('Nome', prodotto.nome, async (nuovoValore) => {
-                const aggiornato = await aggiornaCampoProdotto(prodotto.id, 'nome', nuovoValore);
-                aggiornaRisultatoRicerca(prodotto.id, { nome: nuovoValore });
-                mostraDettaglioProdottoCreato(
-                    aggiornato || { ...prodotto, nome: nuovoValore },
-                    container
-                );
-                await caricaProdottiDisponibili();
-            })
+            creaRigaCampoProdotto(
+                'Nome',
+                prodotto.nome,
+                async (nuovoValore) => {
+                    aggiornaRisultatoRicerca(prodotto.id, { nome: nuovoValore });
+
+                    const handler = creaHandlerUpdateProdotto({
+                        prodottoId: prodotto.id,
+                        campo: 'nome',
+                        container,
+                        prodottoFallback: prodotto,
+                        patchFallback: (valore) => ({ nome: valore }),
+                        afterSuccess: caricaProdottiDisponibili
+                    });
+
+                    await handler(nuovoValore);
+                }
+            )
         );
 
         wrapper.appendChild(
@@ -421,12 +505,16 @@ window.prodottoPage = (function () {
                     throw new Error('Codice non valido');
                 }
 
-                const aggiornato = await aggiornaCampoProdotto(prodotto.id, 'codice', codiceNumerico);
-                mostraDettaglioProdottoCreato(
-                    aggiornato || { ...prodotto, codice: codiceNumerico },
-                    container
-                );
-                await caricaProdottiDisponibili();
+                const handler = creaHandlerUpdateProdotto({
+                    prodottoId: prodotto.id,
+                    campo: 'codice',
+                    container,
+                    prodottoFallback: prodotto,
+                    patchFallback: (valore) => ({ codice: Number(valore) }),
+                    afterSuccess: caricaProdottiDisponibili
+                });
+
+                await handler(codiceNumerico);
             })
         );
 
@@ -528,61 +616,45 @@ window.prodottoPage = (function () {
 
     function renderBloccoProdottoComposto(wrapper, prodotto, container) {
         wrapper.appendChild(
-            creaRigaCampoProdotto('Descrizione', prodotto.descrizione, async (nuovoValore) => {
-                const aggiornato = await aggiornaCampoProdotto(
-                    prodotto.id,
-                    'descrizione',
-                    nuovoValore
-                );
-
-                mostraDettaglioProdottoCreato(
-                    aggiornato || { ...prodotto, descrizione: nuovoValore },
-                    container
-                );
-
-                await caricaProdottiDisponibili();
-            })
+            creaRigaCampoProdotto(
+                'Descrizione',
+                prodotto.descrizione,
+                creaHandlerUpdateProdotto({
+                    prodottoId: prodotto.id,
+                    campo: 'descrizione',
+                    container,
+                    prodottoFallback: prodotto,
+                    patchFallback: (valore) => ({ descrizione: valore }),
+                    afterSuccess: caricaProdottiDisponibili
+                })
+            )
         );
-
         wrapper.appendChild(
             creaRigaCampoProdotto(
                 'Prezzo minimo',
                 formattaPrezzo(prodotto.prezzoMin),
-                async (nuovoValore) => {
-                    const aggiornato = await aggiornaCampoProdotto(
-                        prodotto.id,
-                        'prezzoMin',
-                        nuovoValore
-                    );
-
-                    mostraDettaglioProdottoCreato(
-                        aggiornato || { ...prodotto, prezzoMin: Number(nuovoValore) },
-                        container
-                    );
-
-                    await caricaProdottiDisponibili();
-                }
+                creaHandlerUpdateProdotto({
+                    prodottoId: prodotto.id,
+                    campo: 'prezzoMin',
+                    container,
+                    prodottoFallback: prodotto,
+                    patchFallback: (valore) => ({ prezzoMin: Number(valore) }),
+                    afterSuccess: caricaProdottiDisponibili
+                })
             )
         );
-
         wrapper.appendChild(
             creaRigaCampoProdotto(
                 'Prezzo massimo',
                 formattaPrezzo(prodotto.prezzoMax),
-                async (nuovoValore) => {
-                    const aggiornato = await aggiornaCampoProdotto(
-                        prodotto.id,
-                        'prezzoMax',
-                        nuovoValore
-                    );
-
-                    mostraDettaglioProdottoCreato(
-                        aggiornato || { ...prodotto, prezzoMax: Number(nuovoValore) },
-                        container
-                    );
-
-                    await caricaProdottiDisponibili();
-                }
+                creaHandlerUpdateProdotto({
+                    prodottoId: prodotto.id,
+                    campo: 'prezzoMax',
+                    container,
+                    prodottoFallback: prodotto,
+                    patchFallback: (valore) => ({ prezzoMax: Number(valore) }),
+                    afterSuccess: caricaProdottiDisponibili
+                })
             )
         );
 
@@ -620,12 +692,8 @@ window.prodottoPage = (function () {
 
         card.appendChild(
             creaRigaCampoProdotto('Nome', nodo.nome, async (nuovoValore) => {
-                const aggiornato = await aggiornaCampoProdotto(nodo.id, 'nome', nuovoValore);
-                if (aggiornato) {
-                    mostraDettaglioProdottoCreato(aggiornato, container);
-                } else {
-                    await refreshContenitoreDaPadre(padreId, container);
-                }
+                const risposta = await aggiornaCampoProdotto(nodo.id, 'nome', nuovoValore);
+                await rerenderDaRisposta(risposta, padreId, container);
                 await caricaProdottiDisponibili();
             })
         );
@@ -642,16 +710,8 @@ window.prodottoPage = (function () {
         if (nodo.tipo === 'COMPOSTO') {
             card.appendChild(
                 creaRigaCampoProdotto('Descrizione', nodo.descrizione, async (nuovoValore) => {
-                    const aggiornato = await aggiornaCampoProdotto(
-                        nodo.id,
-                        'descrizione',
-                        nuovoValore
-                    );
-                    if (aggiornato) {
-                        mostraDettaglioProdottoCreato(aggiornato, container);
-                    } else {
-                        await refreshContenitoreDaPadre(padreId, container);
-                    }
+                    const risposta = await aggiornaCampoProdotto(nodo.id, 'descrizione', nuovoValore);
+                    await rerenderDaRisposta(risposta, padreId, container);
                     await caricaProdottiDisponibili();
                 })
             );
@@ -661,16 +721,8 @@ window.prodottoPage = (function () {
                     'Prezzo minimo',
                     formattaPrezzo(nodo.prezzoMin),
                     async (nuovoValore) => {
-                        const aggiornato = await aggiornaCampoProdotto(
-                            nodo.id,
-                            'prezzoMin',
-                            nuovoValore
-                        );
-                        if (aggiornato) {
-                            mostraDettaglioProdottoCreato(aggiornato, container);
-                        } else {
-                            await refreshContenitoreDaPadre(padreId, container);
-                        }
+                        const risposta = await aggiornaCampoProdotto(nodo.id, 'prezzoMin', nuovoValore);
+                        await rerenderDaRisposta(risposta, padreId, container);
                         await caricaProdottiDisponibili();
                     }
                 )
@@ -681,16 +733,8 @@ window.prodottoPage = (function () {
                     'Prezzo massimo',
                     formattaPrezzo(nodo.prezzoMax),
                     async (nuovoValore) => {
-                        const aggiornato = await aggiornaCampoProdotto(
-                            nodo.id,
-                            'prezzoMax',
-                            nuovoValore
-                        );
-                        if (aggiornato) {
-                            mostraDettaglioProdottoCreato(aggiornato, container);
-                        } else {
-                            await refreshContenitoreDaPadre(padreId, container);
-                        }
+                        const risposta = await aggiornaCampoProdotto(nodo.id, 'prezzoMax', nuovoValore);
+                        await rerenderDaRisposta(risposta, padreId, container);
                         await caricaProdottiDisponibili();
                     }
                 )
@@ -716,19 +760,11 @@ window.prodottoPage = (function () {
                 try {
                     const aggiornato = await rimuoviAssociazionePadreFiglio(nodo.id, padreId);
 
-                    if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
-                        && window.ricercaPage
-                        && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
-                        window.ricercaPage.rimuoviRisultatoDaLista(nodo.id, 'PRODOTTO');
-                    }
+                    aggiornaRisultatoRicercaProdottoSeServe(nodo.id);
 
                     mostraMessaggio('Sottoprodotto rimosso correttamente.', 'success');
 
-                    if (aggiornato) {
-                        mostraDettaglioProdottoCreato(aggiornato, container);
-                    } else {
-                        await refreshContenitoreDaPadre(padreId, container);
-                    }
+                    await rerenderDaRisposta(aggiornato, padreId, container);
 
                     await caricaProdottiDisponibili();
                 } catch (error) {
@@ -758,11 +794,7 @@ window.prodottoPage = (function () {
                 try {
                     await eliminaOggetto(nodo.id, nodo.tipo);
 
-                    if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
-                        && window.ricercaPage
-                        && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
-                        window.ricercaPage.rimuoviRisultatoDaLista(nodo.id, 'PRODOTTO');
-                    }
+                    aggiornaRisultatoRicercaProdottoSeServe(nodo.id);
 
                     mostraMessaggio('Prodotto eliminato con successo.', 'success');
 
@@ -810,7 +842,7 @@ window.prodottoPage = (function () {
                 bloccoSku.appendChild(vuoto);
             } else {
                 nodo.skuList.forEach((sku) => {
-                    bloccoSku.appendChild(renderRigaSkuDettaglio(sku, nodo, container, padreId));
+                    bloccoSku.appendChild(renderRigaSkuDettaglio(sku, nodo, container));
                 });
             }
 
@@ -839,26 +871,18 @@ window.prodottoPage = (function () {
         const bloccoInfo = document.createElement('div');
         bloccoInfo.className = 'tree-meta';
 
-        bloccoInfo.appendChild(
-            creaRigaCampoSku('Codice', sku.codice, async (nuovoValore) => {
-                const aggiornato = await aggiornaCampoSku(sku.id, 'codice', nuovoValore);
-                await rerenderDopoUpdateSku(aggiornato, prodottoPadre.id, container);
-            })
-        );
-
-        bloccoInfo.appendChild(
-            creaRigaCampoSku('Nome', sku.nome, async (nuovoValore) => {
-                const aggiornato = await aggiornaCampoSku(sku.id, 'nome', nuovoValore);
-                await rerenderDopoUpdateSku(aggiornato, prodottoPadre.id, container);
-            })
-        );
-
-        bloccoInfo.appendChild(
-            creaRigaCampoSku('Prezzo', formattaPrezzo(sku.prezzo), async (nuovoValore) => {
-                const aggiornato = await aggiornaCampoSku(sku.id, 'prezzo', nuovoValore);
-                await rerenderDopoUpdateSku(aggiornato, prodottoPadre.id, container);
-            })
-        );
+        [
+            ['Codice', sku.codice, 'codice'],
+            ['Nome', sku.nome, 'nome'],
+            ['Prezzo', formattaPrezzo(sku.prezzo), 'prezzo']
+        ].forEach(([etichetta, valore, campo]) => {
+            bloccoInfo.appendChild(
+                creaRigaCampoSku(etichetta, valore, async (nuovoValore) => {
+                    const aggiornato = await aggiornaCampoSku(sku.id, campo, nuovoValore);
+                    await rerenderDaRisposta(aggiornato, prodottoPadre.id, container);
+                })
+            );
+        });
 
         riga.appendChild(bloccoInfo);
 
@@ -878,6 +902,7 @@ window.prodottoPage = (function () {
             mostraMessaggio(testo, 'error');
         };
 
+
         const bottoneRimuovi = document.createElement('button');
         bottoneRimuovi.type = 'button';
         bottoneRimuovi.className = 'btn btn-action btn-warning btn-sm';
@@ -889,35 +914,18 @@ window.prodottoPage = (function () {
                 return;
             }
 
-            const conferma = window.confirm(
-                'Vuoi rimuovere questa SKU dal prodotto semplice?'
-            );
+            const conferma = window.confirm('Vuoi rimuovere questa SKU dal prodotto semplice?');
             if (!conferma) {
                 return;
             }
 
             try {
-                const aggiornato = await rimuoviAssociazioneProdottoSku(
-                    prodottoPadre.id,
-                    sku.id
-                );
+                const risposta = await rimuoviAssociazioneProdottoSku(prodottoPadre.id, sku.id);
 
-                if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
-                    && window.ricercaPage
-                    && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
-                    window.ricercaPage.rimuoviRisultatoDaLista(sku.id, 'SKU');
-                }
+                aggiornaRisultatoRicercaSkuSeServe(sku.id);
+                mostraMessaggio('SKU rimossa dal prodotto.', 'success');
 
-                mostraMessaggio(
-                    'SKU rimossa dal prodotto.',
-                    'success'
-                );
-
-                if (aggiornato) {
-                    mostraDettaglioProdottoCreato(aggiornato, container);
-                } else {
-                    await refreshContenitoreDaPadre(prodottoPadre.id, container);
-                }
+                await rerenderDaRisposta(risposta, prodottoPadre.id, container);
 
                 await Promise.all([
                     caricaProdottiDisponibili(),
@@ -951,24 +959,12 @@ window.prodottoPage = (function () {
             }
 
             try {
-                const risultato = await eliminaOggetto(sku.id, 'SKU', prodottoPadre.id);
+                const risposta = await eliminaOggetto(sku.id, 'SKU', prodottoPadre.id);
 
-                if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
-                    && window.ricercaPage
-                    && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
-                    window.ricercaPage.rimuoviRisultatoDaLista(sku.id, 'SKU');
-                }
+                aggiornaRisultatoRicercaSkuSeServe(sku.id);
+                mostraMessaggio('SKU eliminata con successo.', 'success');
 
-                mostraMessaggio(
-                    'SKU eliminata con successo.',
-                    'success'
-                );
-
-                if (risultato && risultato.prodottoAggiornato) {
-                    mostraDettaglioProdottoCreato(risultato.prodottoAggiornato, container);
-                } else {
-                    await refreshContenitoreDaPadre(prodottoPadre.id, container);
-                }
+                await rerenderDaRisposta(risposta, prodottoPadre.id, container);
 
                 await Promise.all([
                     caricaProdottiDisponibili(),
@@ -989,36 +985,22 @@ window.prodottoPage = (function () {
         return riga;
     }
 
-    async function rerenderDopoUpdateSku(rispostaAggiornamento, prodottoPadreId, container) {
-        if (rispostaAggiornamento && rispostaAggiornamento.id && rispostaAggiornamento.tipo) {
-            mostraDettaglioProdottoCreato(rispostaAggiornamento, container);
-            return;
-        }
-
-        if (rispostaAggiornamento && rispostaAggiornamento.prodottoAggiornato) {
-            mostraDettaglioProdottoCreato(rispostaAggiornamento.prodottoAggiornato, container);
-            return;
-        }
-
-        await refreshContenitoreDaPadre(prodottoPadreId, container);
-    }
-
     async function refreshContenitoreDaPadre(prodottoId, container) {
         if (!prodottoId || !container) {
             return;
         }
 
-        try {
-            const prodottoAggiornato = await caricaDettaglioProdotto(prodottoId, 'SEMPLICE');
-            mostraDettaglioProdottoCreato(prodottoAggiornato, container);
-        } catch (error) {
+        for (const tipo of ['SEMPLICE', 'COMPOSTO']) {
             try {
-                const prodottoAggiornato = await caricaDettaglioProdotto(prodottoId, 'COMPOSTO');
+                const prodottoAggiornato = await caricaDettaglioProdotto(prodottoId, tipo);
                 mostraDettaglioProdottoCreato(prodottoAggiornato, container);
-            } catch (secondoErrore) {
-                console.error('[prodotto.js] errore refresh contenitore:', secondoErrore);
+                return;
+            } catch (error) {
+                // provo col tipo successivo
             }
         }
+
+        console.error('[prodotto.js] errore refresh contenitore: impossibile ricaricare il prodotto padre');
     }
 
     function renderBuilder() {
@@ -1037,14 +1019,14 @@ window.prodottoPage = (function () {
         wrapper.appendChild(titolo);
 
         wrapper.appendChild(
-            creaRigaBuilderRoot('Nome', builderState.nome, async (valore) => {
+            creaRigaCampoProdotto('Nome', builderState.nome, async (valore) => {
                 builderState.nome = valore;
                 renderBuilder();
             })
         );
 
         wrapper.appendChild(
-            creaRigaBuilderRoot('Codice', builderState.codice, async (valore) => {
+            creaRigaCampoProdotto('Codice', builderState.codice, async (valore) => {
                 const codiceNumerico = Number(valore);
                 if (!Number.isInteger(codiceNumerico) || codiceNumerico < 0) {
                     window.appFornitore.mostraMessaggioHome(
@@ -1060,7 +1042,7 @@ window.prodottoPage = (function () {
         );
 
         wrapper.appendChild(
-            creaRigaBuilderRoot('Descrizione', builderState.descrizione, async (valore) => {
+            creaRigaCampoProdotto('Descrizione', builderState.descrizione, async (valore) => {
                 builderState.descrizione = valore;
                 renderBuilder();
             })
@@ -1276,15 +1258,6 @@ window.prodottoPage = (function () {
             onSalva,
             maxWidth: '220px',
             marginZero: true
-        });
-    }
-
-    function creaRigaBuilderRoot(etichetta, valoreIniziale, onSalva) {
-        return creaRigaCampoEditabile({
-            etichetta,
-            valoreIniziale,
-            onSalva,
-            maxWidth: '260px'
         });
     }
 
@@ -1956,13 +1929,16 @@ window.prodottoPage = (function () {
         return `builder-sku-${builderSkuSeq}`;
     }
 
-    async function aggiornaCampoProdotto(id, campo, valore) {
+    async function postFormUrlEncoded(url, params) {
         const body = new URLSearchParams();
-        body.append('id', id);
-        body.append('campo', campo);
-        body.append('valore', valore);
 
-        const response = await fetch('apifornitoreprodottoaggiorna', {
+        Object.entries(params).forEach(([chiave, valore]) => {
+            if (valore != null) {
+                body.append(chiave, valore);
+            }
+        });
+
+        const response = await fetch(url, {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -1973,89 +1949,48 @@ window.prodottoPage = (function () {
         });
 
         return window.appFornitore.parseJsonResponse(response);
+    }
+
+    async function aggiornaCampoProdotto(id, campo, valore) {
+        return postFormUrlEncoded('apifornitoreprodottoaggiorna', {
+            id,
+            campo,
+            valore
+        });
     }
 
     async function aggiornaCampoSku(id, campo, valore) {
-        const body = new URLSearchParams();
-        body.append('id', id);
-        body.append('campo', campo);
-        body.append('valore', valore);
-
-        const response = await fetch('apifornitoreskuaggiorna', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                Accept: 'application/json'
-            },
-            body: body.toString()
+        return postFormUrlEncoded('apifornitoreskuaggiorna', {
+            id,
+            campo,
+            valore
         });
-
-        return window.appFornitore.parseJsonResponse(response);
     }
 
     async function rimuoviAssociazioneProdottoSku(prodottoId, skuId) {
-        const body = new URLSearchParams();
-        body.append('tipoRelazione', 'PRODOTTO_SKU');
-        body.append('prodottoId', prodottoId);
-        body.append('skuId', skuId);
-
-        const response = await fetch('apifornitoreassociazionerimuovi', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                Accept: 'application/json'
-            },
-            body: body.toString()
+        return postFormUrlEncoded('apifornitoreassociazionerimuovi', {
+            tipoRelazione: 'PRODOTTO_SKU',
+            prodottoId,
+            skuId
         });
-
-        return window.appFornitore.parseJsonResponse(response);
     }
 
     async function rimuoviAssociazionePadreFiglio(figlioId, padreId) {
-        const body = new URLSearchParams();
-        body.append('tipoRelazione', 'PADRE_FIGLIO');
-        body.append('figlioId', figlioId);
-        body.append('padreId', padreId);
-
-        const response = await fetch('apifornitoreassociazionerimuovi', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                Accept: 'application/json'
-            },
-            body: body.toString()
+        return postFormUrlEncoded('apifornitoreassociazionerimuovi', {
+            tipoRelazione: 'PADRE_FIGLIO',
+            figlioId,
+            padreId
         });
-
-        return window.appFornitore.parseJsonResponse(response);
     }
 
     async function eliminaOggetto(id, tipo, returnProdottoId = null) {
-        const body = new URLSearchParams();
-        body.append('id', id);
-        body.append('tipo', tipo);
-
-        // se stiamo eliminando una SKU dal dettaglio di un prodotto semplice,
-        // passiamo anche l'id del prodotto padre così il backend può restituire
-        // il prodotto aggiornato già pronto da rerenderizzare
-        if (returnProdottoId != null) {
-            body.append('returnProdottoId', returnProdottoId);
-        }
-
-        const response = await fetch('apifornitoreoggettoelimina', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                Accept: 'application/json'
-            },
-            body: body.toString()
+        return postFormUrlEncoded('apifornitoreoggettoelimina', {
+            id,
+            tipo,
+            returnProdottoId
         });
-
-        return window.appFornitore.parseJsonResponse(response);
     }
+
     function formattaPrezzo(valore) {
         const numero = Number(valore);
         return Number.isNaN(numero) ? '0.00' : numero.toFixed(2);
@@ -2076,11 +2011,3 @@ window.prodottoPage = (function () {
         renderDettaglioProdottoInContainer,
     };
 })();
-
-
-
-
-
-
-
-
