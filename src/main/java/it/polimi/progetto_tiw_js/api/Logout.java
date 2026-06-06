@@ -13,7 +13,7 @@ import java.io.IOException;
  * Il redirect verso la login viene gestito dal codice JavaScript.
  */
 @WebServlet("/api/logout")
-public class LogoutServlet extends BaseApiServlet {
+public class Logout extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

@@ -17,7 +17,7 @@ import java.sql.SQLException;
  * e restituisce i dati minimi necessari al frontend.
  */
 @WebServlet("/api/login")
-public class LoginServlet extends BaseApiServlet {
+public class Login extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

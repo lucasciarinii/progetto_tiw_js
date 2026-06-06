@@ -14,7 +14,7 @@ import java.io.IOException;
  * e recuperare i dati minimi da mostrare nella navbar.
  */
 @WebServlet("/api/check-login")
-public class SessionCheckServlet extends BaseApiServlet {
+public class CheckLogin extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 
