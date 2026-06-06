@@ -20,11 +20,13 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
+        // Endpoint accessibile solo a un fornitore autenticato.
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
         String tipoRelazione = req.getParameter("tipoRelazione");
 
+        // Il tipo di relazione serve per capire quale rimozione applicare.
         if (isBlank(tipoRelazione)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Tipo relazione mancante");
@@ -35,6 +37,7 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
             ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
             String tipoRelazionePulito = tipoRelazione.trim().toUpperCase();
 
+            // Smistamento in base al tipo di associazione da rimuovere.
             if ("PRODOTTO_SKU".equals(tipoRelazionePulito)) {
                 rimuoviAssociazioneProdottoSku(req, resp, prodottoDAO);
                 return;
@@ -60,6 +63,7 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
         String prodottoIdParam = req.getParameter("prodottoId");
         String skuIdParam = req.getParameter("skuId");
 
+        // Per rimuovere una SKU da un prodotto semplice servono entrambi gli id.
         if (isBlank(prodottoIdParam) || isBlank(skuIdParam)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametri mancanti per la rimozione della SKU");
@@ -92,6 +96,7 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
             return;
         }
 
+        // La relazione prodotto-SKU ha senso solo per un prodotto semplice.
         if (!"SEMPLICE".equalsIgnoreCase(prodotto.getTipo())) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "La rimozione SKU è consentita solo per prodotti semplici");
@@ -104,6 +109,7 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
             return;
         }
 
+        // Non posso lasciare un prodotto semplice senza nessuna SKU.
         if (prodotto.getSkuList().size() <= 1) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Non puoi rimuovere l'ultima SKU del prodotto");
@@ -121,6 +127,7 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
 
         prodottoDAO.removeSKUDaProdotto(prodottoId, skuId);
 
+        // Dopo la rimozione ricarico il prodotto completo e lo restituisco al frontend.
         Prodotto prodottoAggiornato = prodottoDAO.findByIdConSKU(prodottoId);
         if (prodottoAggiornato == null) {
             sendError(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
@@ -138,6 +145,8 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
         String figlioIdParam = req.getParameter("figlioId");
         String padreIdParam = req.getParameter("padreId");
 
+        // Per scollegare un figlio serve almeno l'id del figlio.
+        // L'id del padre può arrivare come controllo aggiuntivo.
         if (isBlank(figlioIdParam)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametro figlioId mancante");
@@ -181,6 +190,8 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
 
         Integer padreIdReale = figlio.getPadreId();
 
+        // Se il client passa anche il padre atteso, verifico che la relazione
+        // che vuole rimuovere sia davvero quella presente nel database.
         if (padreIdRichiesto != null && !padreIdRichiesto.equals(padreIdReale)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "La relazione padre-figlio non è coerente");
@@ -195,12 +206,14 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
             return;
         }
 
+        // Il padre di una relazione padre-figlio deve essere un composto.
         if (!"COMPOSTO".equalsIgnoreCase(padre.getTipo())) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Il padre deve essere un prodotto composto");
             return;
         }
 
+        // Non posso staccare l'ultimo figlio di un composto.
         if (prodottoDAO.findFigliDiretti(padreIdReale).size() <= 1) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Non puoi rimuovere l'ultimo sottoprodotto del composto");
@@ -209,6 +222,7 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
 
         prodottoDAO.removePadre(figlioId);
 
+        // Ricarico il padre aggiornato così il frontend può riallineare subito l'albero.
         Prodotto padreAggiornato = prodottoDAO.findByIdConDiscendenti(padreIdReale);
         if (padreAggiornato == null) {
             sendError(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
@@ -219,6 +233,9 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
         sendJson(resp, padreAggiornato);
     }
 
+    /**
+     * Utility per controllare stringhe nulle, vuote o fatte solo di spazi.
+     */
     private boolean isBlank(String valore) {
         return valore == null || valore.isBlank();
     }

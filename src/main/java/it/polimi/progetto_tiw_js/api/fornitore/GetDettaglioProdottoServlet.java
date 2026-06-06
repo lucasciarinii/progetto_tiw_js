@@ -13,10 +13,10 @@ import java.sql.SQLException;
 
 /**
  * Restituisce il dettaglio completo di un prodotto.
- *
+ *-
  * Questa servlet viene usata sia nella home del fornitore sia nella ricerca:
  * - per un prodotto semplice serve anche la lista delle SKU associate;
- * - per un prodotto composto serve l'intero sottoalbero dei figli.
+ * - per un prodotto composto serve il sottoalbero dei sottoprodotti.
  */
 @WebServlet("/apifornitoreprodotto-dettaglio")
 public class GetDettaglioProdottoServlet extends BaseApiServlet {
@@ -27,14 +27,14 @@ public class GetDettaglioProdottoServlet extends BaseApiServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        // accesso consentito solo al fornitore autenticato
+        // Il dettaglio prodotto è disponibile solo per un fornitore autenticato.
         if (!isLogged(req, resp)) return;
         if (!hasRole(req, resp, "FORNITORE")) return;
 
         String idParam = req.getParameter("id");
         String tipoParam = req.getParameter("tipo");
 
-        // entrambi i parametri sono obbligatori
+        // Entrambi i parametri sono obbligatori.
         if (isBlank(idParam) || isBlank(tipoParam)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametri id e tipo obbligatori");
@@ -50,6 +50,7 @@ public class GetDettaglioProdottoServlet extends BaseApiServlet {
             return;
         }
 
+        // L'id del prodotto deve essere strettamente positivo.
         if (idProdotto <= 0) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Id prodotto non valido");
@@ -58,6 +59,7 @@ public class GetDettaglioProdottoServlet extends BaseApiServlet {
 
         String tipo = tipoParam.trim().toUpperCase();
 
+        // I soli tipi ammessi sono semplice e composto.
         if (!"SEMPLICE".equals(tipo) && !"COMPOSTO".equals(tipo)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Tipo prodotto non valido");
@@ -68,8 +70,8 @@ public class GetDettaglioProdottoServlet extends BaseApiServlet {
             ProdottoDAO prodottoDAO = new ProdottoDAO(conn);
             Prodotto prodotto;
 
-            // se è semplice carico anche la lista SKU,
-            // se è composto carico tutto il sottoalbero
+            // Se il prodotto è semplice carico anche le SKU associate.
+            // Se invece è composto carico il dettaglio con tutti i discendenti.
             if ("SEMPLICE".equals(tipo)) {
                 prodotto = prodottoDAO.findByIdConSKU(idProdotto);
             } else {
@@ -82,7 +84,8 @@ public class GetDettaglioProdottoServlet extends BaseApiServlet {
                 return;
             }
 
-            // controllo extra: il tipo richiesto deve coincidere con quello reale
+            // Controllo difensivo: il tipo richiesto dal client deve essere
+            // coerente con il tipo reale del prodotto trovato nel database.
             if (!tipo.equalsIgnoreCase(prodotto.getTipo())) {
                 sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                         "Il tipo richiesto non corrisponde al prodotto");
@@ -98,6 +101,9 @@ public class GetDettaglioProdottoServlet extends BaseApiServlet {
         }
     }
 
+    /**
+     * Utility per controllare stringhe nulle, vuote o fatte solo di spazi.
+     */
     private boolean isBlank(String valore) {
         return valore == null || valore.isBlank();
     }
