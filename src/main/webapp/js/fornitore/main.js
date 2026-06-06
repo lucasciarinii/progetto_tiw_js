@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function controllaSessione() {
         try {
-            const resp = await fetch('api/check-login', {
+            const resp = await fetch('api/login', {
                 method: 'GET',
                 credentials: 'same-origin',
                 headers: {

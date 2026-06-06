@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // controlla se la sessione è valida chiamando l'api di check-login
     async function controllaSessione() {
         try {
-            const resp = await fetch('api/check-login', {
+            const resp = await fetch('api/login', {
                 method: 'GET',
                 credentials: 'same-origin', // invia automaticamente i cookie di sessione
                 headers: { 'Accept': 'application/json' }
