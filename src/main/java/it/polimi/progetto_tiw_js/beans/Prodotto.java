@@ -57,5 +57,4 @@ public class Prodotto {
     // utile nei template per non scrivere confronti stringa direttamente
     public boolean isSemplice() { return "SEMPLICE".equals(tipo); }
     public boolean isComposto() { return "COMPOSTO".equals(tipo); }
-    public boolean isPrimoLivello() { return padreId == null; }
 }
