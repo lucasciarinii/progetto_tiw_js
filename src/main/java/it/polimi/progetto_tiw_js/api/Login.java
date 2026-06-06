@@ -13,7 +13,7 @@ import java.io.IOException;
  * Serve alle SPA per capire se l'utente è autenticato
  * e recuperare i dati minimi da mostrare nella navbar.
  */
-@WebServlet("/api/check-login2")
+@WebServlet("/api/login")
 public class Login extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
