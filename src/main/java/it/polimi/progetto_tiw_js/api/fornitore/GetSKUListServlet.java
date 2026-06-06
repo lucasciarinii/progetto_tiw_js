@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Restituisce tutte le SKU presenti nel sistema.
- *-
+ *
  * Questa lista viene usata dal frontend del fornitore
  * per popolare viste, selezioni e dettagli delle SKU.
  */

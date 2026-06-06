@@ -1,15 +1,12 @@
 window.prodottoUi = (function () {
     function formattaPrezzo(valore) {
-        // Converte il valore in numero e lo porta sempre a due decimali.
-        // Se il valore non è numerico, restituisce "0.00".
+        // Converte il valore in numero e lo mostra sempre con due decimali.
         const numero = Number(valore);
         return Number.isNaN(numero) ? '0.00' : numero.toFixed(2);
     }
 
     function escapeHtml(valore) {
-        // Piccola utility di sanificazione:
-        // trasforma i caratteri speciali HTML nelle rispettive entità,
-        // così evito injection quando uso innerHTML.
+        // Sanificazione minimale per i casi in cui uso innerHTML.
         return String(valore ?? '')
             .replaceAll('&', '&amp;')
             .replaceAll('<', '&lt;')
@@ -19,9 +16,7 @@ window.prodottoUi = (function () {
     }
 
     function creaRigaCampoEditabile({ etichetta, valoreIniziale, onSalva, maxWidth = '260px' }) {
-        // Crea una riga del tipo:
-        // <p><strong>Etichetta:</strong> <span>valore</span></p>
-        // dove il valore diventa editabile al click.
+        // Crea una riga con etichetta e valore cliccabile, modificabile inline.
         const riga = document.createElement('p');
 
         const label = document.createElement('strong');
@@ -35,7 +30,6 @@ window.prodottoUi = (function () {
         riga.appendChild(spanValore);
 
         spanValore.addEventListener('click', () => {
-            // Quando clicco sul valore, lo sostituisco con un input text.
             const input = document.createElement('input');
             input.type = 'text';
             input.value = valoreIniziale ?? '';
@@ -45,14 +39,15 @@ window.prodottoUi = (function () {
             riga.replaceChild(input, spanValore);
             input.focus();
 
-            // Se possibile seleziono tutto il contenuto,
-            // così l'utente può scrivere subito il nuovo valore.
-            if (typeof input.select === 'function') input.select();
+            // Se possibile seleziono subito tutto il testo.
+            if (typeof input.select === 'function') {
+                input.select();
+            }
 
             let annullato = false;
 
             input.addEventListener('keydown', (event) => {
-                // Escape annulla la modifica e ripristina il vecchio span.
+                // Escape annulla la modifica e ripristina il valore precedente.
                 if (event.key === 'Escape') {
                     annullato = true;
                     riga.replaceChild(spanValore, input);
@@ -62,14 +57,15 @@ window.prodottoUi = (function () {
             input.addEventListener(
                 'blur',
                 async () => {
-                    // Quando l'input perde il focus, salvo automaticamente.
-                    // Se era già stato annullato con Escape, non faccio nulla.
-                    if (annullato) return;
+                    // Al blur provo a salvare il nuovo valore.
+                    if (annullato) {
+                        return;
+                    }
 
                     try {
                         await onSalva(input.value.trim());
                     } catch (error) {
-                        // Se il salvataggio fallisce, ripristino la vista precedente.
+                        // In caso di errore ripristino la vista precedente.
                         riga.replaceChild(spanValore, input);
                     }
                 },
@@ -81,28 +77,41 @@ window.prodottoUi = (function () {
     }
 
     function creaRigaCampoProdotto(etichetta, valoreIniziale, onSalva) {
-        // Wrapper specializzato per i campi del prodotto.
-        return creaRigaCampoEditabile({ etichetta, valoreIniziale, onSalva, maxWidth: '260px' });
+        // Wrapper per i campi prodotto.
+        return creaRigaCampoEditabile({
+            etichetta,
+            valoreIniziale,
+            onSalva,
+            maxWidth: '260px'
+        });
     }
 
     function creaRigaCampoSku(etichetta, valoreIniziale, onSalva) {
-        // Wrapper specializzato per i campi SKU.
-        // Ha una larghezza un po' più stretta.
-        return creaRigaCampoEditabile({ etichetta, valoreIniziale, onSalva, maxWidth: '220px' });
+        // Wrapper per i campi SKU.
+        return creaRigaCampoEditabile({
+            etichetta,
+            valoreIniziale,
+            onSalva,
+            maxWidth: '220px'
+        });
     }
 
     function creaBottoneAzione(testo, className, title) {
-        // Utility per creare velocemente un bottone azione coerente con lo stile condiviso.
+        // Crea un bottone azione coerente con lo stile condiviso.
         const bottone = document.createElement('button');
         bottone.type = 'button';
         bottone.className = `btn btn-action ${className}`.trim();
         bottone.textContent = testo;
-        if (title) bottone.title = title;
+
+        if (title) {
+            bottone.title = title;
+        }
+
         return bottone;
     }
 
     function creaVoceMenu(testo, onClick) {
-        // Utility per creare una voce di menu / bottone secondario.
+        // Crea una voce del menu contestuale.
         const bottone = document.createElement('button');
         bottone.type = 'button';
         bottone.className = 'btn btn-ghost btn-sm';
@@ -112,7 +121,6 @@ window.prodottoUi = (function () {
     }
 
     return {
-        // API pubblica del modulo UI.
         formattaPrezzo,
         escapeHtml,
         creaRigaCampoProdotto,

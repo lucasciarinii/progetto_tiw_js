@@ -18,7 +18,7 @@ import java.sql.SQLException;
 
 /**
  * Crea una nuova SKU e restituisce il dettaglio completo in JSON.
- *-
+ *
  * Nota:
  * la richiesta arriva come multipart/form-data perché la form può contenere
  * anche il file della fotografia. Per questo motivo, anche i campi testuali
@@ -118,6 +118,12 @@ public class CreaSKUServlet extends BaseApiServlet {
 
             // Rileggo la SKU completa dal DB e la restituisco al frontend.
             SKU skuCreata = skuDAO.findById(idGenerato);
+            if (skuCreata == null) {
+                sendError(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                        "Impossibile ricaricare la SKU appena creata");
+                return;
+            }
+
             sendJson(resp, skuCreata);
 
         } catch (SQLException e) {
@@ -168,7 +174,7 @@ public class CreaSKUServlet extends BaseApiServlet {
     /**
      * Salva la fotografia della SKU nella cartella uploads dell'applicazione
      * e restituisce il percorso relativo da memorizzare nel database.
-     *-
+     *
      * Se qualcosa va storto, ritorna null.
      */
     private String salvaFoto(Part part) {

@@ -61,7 +61,7 @@
 <body>
 
 <!--! SEZIONE HOME ──────────────────────────────────────────────── -->
-<div id="sezione-home">
+<section id="sezione-home">
     <nav class="navbar">
         <span class="navbar-brand">Pannello Cliente</span>
         <ul class="navbar-links">
@@ -81,7 +81,7 @@
     <main class="main-content">
         <h1 class="page-title">Prodotti disponibili</h1>
 
-        <div id="message-box-home" class="alert" hidden></div>
+        <div id="message-box-home" class="alert" hidden aria-live="polite"></div>
 
         <div class="card">
             <!-- lista popolata da homecliente.js -->
@@ -91,10 +91,10 @@
         <!-- paginazione: costruita dinamicamente da homecliente.js -->
         <div id="paginazione-home" class="paginazione" hidden></div>
     </main>
-</div>
+</section>
 
 <!--! SEZIONE SCELTA SKU ───────────────────────────────  -->
-<div id="sezione-scelta-sku" hidden>
+<section id="sezione-scelta-sku" hidden>
     <nav class="navbar">
         <span class="navbar-brand">Pannello Cliente</span>
         <ul class="navbar-links">
@@ -114,7 +114,7 @@
         <!-- titolo aggiornato dinamicamente da sceltaSku.js -->
         <h1 class="page-title" id="scelta-sku-titolo">Configurazione prodotto</h1>
 
-        <div id="message-box-scelta-sku" class="alert" hidden></div>
+        <div id="message-box-scelta-sku" class="alert" hidden aria-live="polite"></div>
 
         <!-- nome della configurazione -->
         <div class="card" style="margin-bottom:1rem;">
@@ -136,10 +136,10 @@
             Salva configurazione
         </button>
     </main>
-</div>
+</section>
 
 <!--! SEZIONE "LE MIE CONFIGURAZIONI" ─────────────────────────────── -->
-<div id="sezione-mie-configurazioni" hidden>
+<section id="sezione-mie-configurazioni" hidden>
     <nav class="navbar">
         <span class="navbar-brand">Pannello Cliente</span>
         <ul class="navbar-links">
@@ -158,7 +158,7 @@
     <main class="main-content">
         <h1 class="page-title">Le mie configurazioni</h1>
 
-        <div id="message-box-configurazioni" class="alert" hidden></div>
+        <div id="message-box-configurazioni" class="alert" hidden aria-live="polite"></div>
 
         <!-- stato vuoto -->
         <div id="configurazioni-vuoto" class="card" hidden>
@@ -171,24 +171,24 @@
         <div class="table-wrapper card">
             <table>
                 <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Creata il</th>
-                        <th>Ultima modifica</th>
-                        <th>Prezzo totale</th>
-                        <th>Azioni</th>
-                    </tr>
+                <tr>
+                    <th>Nome</th>
+                    <th>Creata il</th>
+                    <th>Ultima modifica</th>
+                    <th>Prezzo totale</th>
+                    <th>Azioni</th>
+                </tr>
                 </thead>
                 <tbody id="configurazioni-tbody">
-                    <!-- righe popolate da configurazioni.js -->
+                <!-- righe popolate da configurazioni.js -->
                 </tbody>
             </table>
         </div>
     </main>
-</div>
+</section>
 
 <!--! SEZIONE DETTAGLIO CONFIGURAZIONE ──────────────────────────── -->
-<div id="sezione-dettaglio" hidden>
+<section id="sezione-dettaglio" hidden>
     <nav class="navbar">
         <span class="navbar-brand">Pannello Cliente</span>
         <ul class="navbar-links">
@@ -208,7 +208,7 @@
         <!-- titolo = nome configurazione -->
         <h1 class="page-title" id="dettaglio-titolo">Dettaglio configurazione</h1>
 
-        <div id="message-box-dettaglio" class="alert" hidden></div>
+        <div id="message-box-dettaglio" class="alert" hidden aria-live="polite"></div>
 
         <!-- meta della configurazione -->
         <div class="card" style="margin-bottom:1rem;">
@@ -229,27 +229,27 @@
             <div class="table-wrapper">
                 <table>
                     <thead>
-                        <tr>
-                            <th>Codice SKU</th>
-                            <th>Nome</th>
-                            <th>Descrizione tecnica</th>
-                            <th>Prezzo</th>
-                        </tr>
+                    <tr>
+                        <th>Codice SKU</th>
+                        <th>Nome</th>
+                        <th>Descrizione tecnica</th>
+                        <th>Prezzo</th>
+                    </tr>
                     </thead>
                     <tbody id="dettaglio-sku-tbody">
-                        <!-- righe popolate da dettaglio.js -->
+                    <!-- righe popolate da dettaglio.js -->
                     </tbody>
                     <tfoot>
-                        <tr>
-                            <td colspan="3" style="text-align:right;">Totale</td>
-                            <td id="dettaglio-totale">—</td>
-                        </tr>
+                    <tr>
+                        <td colspan="3" style="text-align:right;">Totale</td>
+                        <td id="dettaglio-totale">—</td>
+                    </tr>
                     </tfoot>
                 </table>
             </div>
         </div>
     </main>
-</div>
+</section>
 
 <!-- ══════════════════════════════════════════════════════════════
      SCRIPT JS

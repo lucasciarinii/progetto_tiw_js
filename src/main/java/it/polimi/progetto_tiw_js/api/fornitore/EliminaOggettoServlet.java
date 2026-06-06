@@ -46,13 +46,21 @@ public class EliminaOggettoServlet extends BaseApiServlet {
         }
 
         int id;
-        Integer returnProdottoId = parseNullableInt(returnProdottoIdStr);
+        Integer returnProdottoId;
 
         try {
             id = Integer.parseInt(idStr.trim());
         } catch (NumberFormatException e) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Parametro id non valido");
+            return;
+        }
+
+        try {
+            returnProdottoId = parseNullableIntStrict(returnProdottoIdStr);
+        } catch (NumberFormatException e) {
+            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "Parametro returnProdottoId non valido");
             return;
         }
 
@@ -204,15 +212,10 @@ public class EliminaOggettoServlet extends BaseApiServlet {
         return valore == null || valore.isBlank();
     }
 
-    private Integer parseNullableInt(String value) {
+    private Integer parseNullableIntStrict(String value) {
         if (isBlank(value)) {
             return null;
         }
-
-        try {
-            return Integer.parseInt(value.trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        return Integer.parseInt(value.trim());
     }
 }

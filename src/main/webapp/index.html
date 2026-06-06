@@ -14,7 +14,7 @@
         <p class="login-subtitle">Accedi al tuo account</p>
     </div>
 
-    <div id="errore-login" class="alert alert-error" style="display:none;">
+    <div id="errore-login" class="alert alert-error" style="display:none;" role="alert" aria-live="assertive">
         Username o password non validi. Riprova.
     </div>
 
@@ -28,6 +28,7 @@
                    required
                    autofocus>
         </div>
+
         <div class="form-group">
             <label for="password">Password</label>
             <input type="password"
@@ -36,11 +37,13 @@
                    autocomplete="current-password"
                    required>
         </div>
+
         <button type="submit" class="btn btn-primary btn-full">Accedi</button>
     </form>
-    <p class="login-end">Mady by Luca Sciarini &amp; Leonardo Taccari</p>
+
+    <p class="login-end">Made by Luca Sciarini &amp; Leonardo Taccari</p>
 </main>
 
-<script src="js/login.js"></script>
+<script src="js/login.js" defer></script>
 </body>
 </html>

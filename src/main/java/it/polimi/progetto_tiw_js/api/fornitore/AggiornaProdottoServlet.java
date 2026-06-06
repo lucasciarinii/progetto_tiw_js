@@ -36,9 +36,13 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
         String campo = req.getParameter("campo");
         String valore = req.getParameter("valore");
 
+        // Normalizzo subito il nome del campo così uso sempre
+        // una forma coerente per i controlli successivi.
+        String campoPulito = campo == null ? null : campo.trim().toLowerCase();
+
         // Se manca anche solo uno dei parametri indispensabili,
         // la richiesta non è valida e viene rifiutata subito.
-        if (isBlank(idParam) || isBlank(campo) || valore == null) {
+        if (isBlank(idParam) || isBlank(campoPulito) || valore == null) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Parametri mancanti");
             return;
         }
@@ -65,10 +69,8 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
 
             // Normalizzo i valori che mi servono per i controlli:
             // - tipoProdotto lo porto in maiuscolo per confrontarlo in modo stabile
-            // - campoPulito lo porto in minuscolo per gestire il nome del campo
-            //   senza dipendere da maiuscole/minuscole inviate dal client.
+            // - campoPulito è già stato pulito all'inizio del metodo
             String tipoProdotto = normalizeUpper(prodotto.getTipo());
-            String campoPulito = campo.trim().toLowerCase();
 
             // Gestisco un campo alla volta.
             // Ogni case si occupa di:
@@ -77,7 +79,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
             // 3) chiamare il metodo DAO specifico di update
             switch (campoPulito) {
                 case "nome" -> {
-                    String nome = valore.trim();
+                    String nome = trimToEmpty(valore);
 
                     // Il nome è obbligatorio per qualsiasi tipo di prodotto.
                     if (nome.isBlank()) {
@@ -124,7 +126,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
                         return;
                     }
 
-                    String descrizione = valore.trim();
+                    String descrizione = trimToEmpty(valore);
 
                     // Anche la descrizione non può essere lasciata vuota.
                     if (descrizione.isBlank()) {
@@ -247,7 +249,7 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
     // invece di lanciare eccezione restituisce null.
     private Integer parseInt(String valore) {
         try {
-            return Integer.parseInt(valore.trim());
+            return Integer.parseInt(trimToEmpty(valore));
         } catch (NumberFormatException e) {
             return null;
         }
@@ -257,10 +259,14 @@ public class AggiornaProdottoServlet extends BaseApiServlet {
     // Torna utile per i campi di prezzo.
     private Double parseDouble(String valore) {
         try {
-            return Double.parseDouble(valore.trim());
+            return Double.parseDouble(trimToEmpty(valore));
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private String trimToEmpty(String valore) {
+        return valore == null ? "" : valore.trim();
     }
 
     // Mi serve solo nel punto finale, per capire quale metodo DAO usare

@@ -36,10 +36,10 @@ public class SessionCheckServlet extends BaseApiServlet {
         risposta.addProperty("loggedIn", true);
 
         JsonObject utenteJson = new JsonObject();
+        utenteJson.addProperty("id", utente.getId());
         utenteJson.addProperty("nome", utente.getNome());
         utenteJson.addProperty("cognome", utente.getCognome());
         utenteJson.addProperty("ruolo", utente.getRuolo());
-        utenteJson.addProperty("id", utente.getId());
 
         risposta.add("utente", utenteJson);
 

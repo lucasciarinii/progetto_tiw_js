@@ -38,18 +38,18 @@ public class RimuoviAssociazioneServlet extends BaseApiServlet {
             String tipoRelazionePulito = tipoRelazione.trim().toUpperCase();
 
             // Smistamento in base al tipo di associazione da rimuovere.
-            if ("PRODOTTO_SKU".equals(tipoRelazionePulito)) {
-                rimuoviAssociazioneProdottoSku(req, resp, prodottoDAO);
-                return;
+            switch (tipoRelazionePulito) {
+                case "PRODOTTO_SKU" -> {
+                    rimuoviAssociazioneProdottoSku(req, resp, prodottoDAO);
+                    return;
+                }
+                case "PADRE_FIGLIO" -> {
+                    rimuoviAssociazionePadreFiglio(req, resp, prodottoDAO);
+                    return;
+                }
+                default -> sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
+                        "Tipo relazione non valido");
             }
-
-            if ("PADRE_FIGLIO".equals(tipoRelazionePulito)) {
-                rimuoviAssociazionePadreFiglio(req, resp, prodottoDAO);
-                return;
-            }
-
-            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                    "Tipo relazione non valido");
 
         } catch (SQLException e) {
             throw new ServletException("Errore durante la rimozione dell'associazione", e);

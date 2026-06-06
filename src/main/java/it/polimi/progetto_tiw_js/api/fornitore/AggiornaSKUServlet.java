@@ -55,11 +55,16 @@ public class AggiornaSKUServlet extends BaseApiServlet {
         String campo = multipart ? leggiCampoTestuale(req, "campo") : req.getParameter("campo");
         String valore = multipart ? leggiCampoTestuale(req, "valore") : req.getParameter("valore");
 
+        // Normalizzo subito il nome del campo:
+        // tolgo spazi superflui e lo porto in minuscolo,
+        // così da usare sempre una sola forma nel resto del metodo.
+        String campoPulito = campo == null ? null : campo.trim().toLowerCase();
+
         // Validazione minima della richiesta:
         // id e campo devono esserci sempre;
         // valore deve esserci per tutti i casi tranne fotografia,
         // perché lì il dato vero arriva nel file uploadato.
-        if (isBlank(idParam) || isBlank(campo) || (valore == null && !"fotografia".equalsIgnoreCase(campo))) {
+        if (isBlank(idParam) || isBlank(campoPulito) || (valore == null && !"fotografia".equals(campoPulito))) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Parametri mancanti");
             return;
         }
@@ -82,11 +87,6 @@ public class AggiornaSKUServlet extends BaseApiServlet {
                 sendError(resp, HttpServletResponse.SC_NOT_FOUND, "SKU non trovata");
                 return;
             }
-
-            // Normalizzo il nome del campo:
-            // tolgo spazi inutili e lo porto in minuscolo,
-            // così lo switch non dipende da come arriva dal client.
-            String campoPulito = campo.trim().toLowerCase();
 
             switch (campoPulito) {
 

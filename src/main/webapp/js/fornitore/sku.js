@@ -1,80 +1,66 @@
 window.skuPage = (function () {
-
-    // Modulo dedicato alla gestione delle SKU lato fornitore.
-    // Qui teniamo tutta la logica relativa a:
-    // - creazione della SKU dal form nella home;
-    // - visualizzazione del dettaglio nel pannello di destra;
-    // - modifica inline dei singoli campi;
-    // - eliminazione della SKU e aggiornamento della UI collegata.
-    //
-    // L'idea è concentrare qui il comportamento delle SKU, così gli altri moduli
-    // non devono conoscere i dettagli interni di rendering e aggiornamento.
+    // Stato locale del modulo SKU.
     const stato = {
         // SKU attualmente mostrata nel pannello di dettaglio.
-        // Viene mantenuta lato client per poter ridisegnare il dettaglio
-        // subito dopo una modifica, senza dover sempre ricaricare tutto da zero.
         skuSelezionata: null
     };
 
-    // Riferimenti agli elementi DOM principali usati da questo modulo.
-    // Li inizializziamo in init(), quando la pagina è pronta.
+    // Riferimenti principali al DOM.
     let formCreaSku;
     let dettaglioContent;
 
-    function mostraMessaggioGlobale(testo, tipo) {
-        // Punto unico per decidere dove mostrare i messaggi utente.
-        //
-        // Se il dettaglio della SKU è aperto dentro la sezione ricerca,
-        // conviene usare il box messaggi locale della ricerca stessa,
-        // così l'utente vede il feedback nel contesto giusto.
-        //
-        // In tutti gli altri casi usiamo la messaggistica della home fornitore.
-        if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
-            && window.ricercaPage
-            && typeof window.ricercaPage.mostraMessaggioRicerca === 'function') {
-            window.ricercaPage.mostraMessaggioRicerca(testo, tipo);
-            return;
+    function isContainerRicerca(container) {
+        // Capisco il contesto guardando il contenitore reale del dettaglio.
+        return container?.id === 'ricerca-dettaglio';
+    }
+
+    function mostraMessaggioPerContainer(container, testo, tipo) {
+        // Il messaggio deve seguire il pannello che ha generato l'azione.
+        if (isContainerRicerca(container)) {
+            if (window.appFornitore?.mostraMessaggioRicerca) {
+                window.appFornitore.mostraMessaggioRicerca(testo, tipo);
+                return;
+            }
+
+            if (window.ricercaPage?.mostraMessaggioRicerca) {
+                window.ricercaPage.mostraMessaggioRicerca(testo, tipo);
+                return;
+            }
         }
 
-        window.appFornitore.mostraMessaggioHome(testo, tipo);
+        window.appFornitore?.mostraMessaggioHome?.(testo, tipo);
+    }
+
+    function mostraMessaggioGlobale(container, testo, tipo) {
+        mostraMessaggioPerContainer(container, testo, tipo);
     }
 
     async function init() {
-        // Recupero degli elementi principali della sezione home fornitore.
-        // Se in futuro cambia l'HTML, i primi id da controllare sono questi.
+        // Recupero i riferimenti principali della home fornitore.
         formCreaSku = document.getElementById('form-crea-sku');
         dettaglioContent = document.getElementById('dettaglio-content');
 
-        // Il form di creazione SKU viene gestito tutto qui:
-        // submit, validazione, chiamata al server e aggiornamento della UI.
         if (formCreaSku) {
             formCreaSku.addEventListener('submit', onSubmitCreaSku);
         }
 
-        // All'avvio il pannello di dettaglio parte in stato neutro.
         renderMessaggioDettaglioVuoto();
     }
 
     async function aggiornaListaSkuProdotti() {
-        // Dopo create / update / delete di una SKU è bene riallineare anche prodotto.js,
-        // perché il builder dei prodotti semplici o composti può dipendere
-        // dalla lista aggiornata delle SKU disponibili.
+        // Dopo create / update / delete SKU riallineo anche la parte prodotto.
         if (window.prodottoPage && typeof window.prodottoPage.caricaSkuDisponibili === 'function') {
             await window.prodottoPage.caricaSkuDisponibili();
         }
     }
 
     async function onSubmitCreaSku(event) {
-        // Il submit del form viene gestito via JavaScript:
-        // blocchiamo il submit HTML classico e facciamo una chiamata fetch alla servlet JSON.
+        // Submit gestito via fetch verso la servlet JSON.
         event.preventDefault();
         window.appFornitore.nascondiMessaggi();
 
         const formData = new FormData(formCreaSku);
 
-        // Prima della chiamata al server facciamo una validazione minima lato client.
-        // Questo non sostituisce i controlli server-side, ma evita richieste inutili
-        // per errori banali già intercettabili nel browser.
         if (!validaFormSku(formData)) {
             return;
         }
@@ -87,23 +73,13 @@ window.skuPage = (function () {
             });
 
             const data = await window.appFornitore.parseJsonResponse(response);
-
-            // Gestione un po' difensiva della risposta:
-            // il backend potrebbe restituire direttamente la SKU,
-            // oppure incapsularla in una proprietà "sku".
             const skuCreata = data && data.sku ? data.sku : data;
 
-            // Se la creazione va a buon fine, puliamo il form
-            // e mostriamo subito un feedback all'utente.
             formCreaSku.reset();
             window.appFornitore.mostraMessaggioHome('SKU creata con successo.', 'success');
 
-            // Ricarichiamo le liste collegate usate dalla parte prodotti.
             await aggiornaListaSkuProdotti();
 
-            // Se abbiamo davvero ricevuto l'oggetto creato con il suo id,
-            // apriamo subito il dettaglio della nuova SKU.
-            // In caso contrario lasciamo il pannello nello stato standard.
             if (skuCreata && skuCreata.id) {
                 mostraDettaglioSku(skuCreata);
             } else {
@@ -120,36 +96,28 @@ window.skuPage = (function () {
     }
 
     function validaFormSku(formData) {
-        // Estraiamo e normalizziamo tutti i campi del form.
-        // Anche se arrivano come FormData, qui li trasformiamo subito
-        // in stringhe pulite per semplificare i controlli.
-        const codice = (formData.get('codice') || '').toString().trim();
-        const nome = (formData.get('nome') || '').toString().trim();
-        const descrizioneTecnica = (formData.get('descrizioneTecnica') || '').toString().trim();
-        const prezzo = (formData.get('prezzo') || '').toString().trim();
+        // Estraggo e normalizzo i campi del form.
+        const codice = String(formData.get('codice') || '').trim();
+        const nome = String(formData.get('nome') || '').trim();
+        const descrizioneTecnica = String(formData.get('descrizioneTecnica') || '').trim();
+        const prezzo = String(formData.get('prezzo') || '').trim();
         const fotografia = formData.get('fotografia');
 
-        // Controllo sui campi obbligatori.
         if (!codice || !nome || !descrizioneTecnica || !prezzo) {
             window.appFornitore.mostraMessaggioHome('Compila tutti i campi obbligatori.', 'error');
             return false;
         }
 
-        // Il codice della SKU deve essere un intero non negativo.
         if (!/^\d+$/.test(codice)) {
             window.appFornitore.mostraMessaggioHome('Il codice deve essere un numero intero valido.', 'error');
             return false;
         }
 
-        // Il prezzo deve essere un numero valido e non negativo.
         if (Number.isNaN(Number(prezzo)) || Number(prezzo) < 0) {
             window.appFornitore.mostraMessaggioHome('Il prezzo inserito non è valido.', 'error');
             return false;
         }
 
-        // La fotografia è opzionale.
-        // Però, se l'utente la carica, facciamo almeno due controlli di base:
-        // tipo file e dimensione massima.
         if (fotografia && fotografia.size > 0) {
             if (!fotografia.type.startsWith('image/')) {
                 window.appFornitore.mostraMessaggioHome('La fotografia deve essere un file immagine valido.', 'error');
@@ -167,27 +135,20 @@ window.skuPage = (function () {
     }
 
     function mostraDettaglioSku(sku) {
-        // Quando una SKU viene selezionata o appena creata,
-        // ne salviamo una copia nello stato locale
-        // e ridisegniamo il pannello di dettaglio.
+        // Salvo una copia locale della SKU e aggiorno il pannello dettaglio della home.
         stato.skuSelezionata = sku ? { ...sku } : null;
         renderDettaglioSkuInContainer(stato.skuSelezionata, dettaglioContent);
     }
 
     function renderDettaglioSkuInContainer(sku, container) {
-        // Questa funzione costruisce tutto il dettaglio della SKU
-        // dentro il contenitore passato.
-        // In questo modo può essere usata sia nella home sia nella ricerca,
-        // senza dipendere da un solo pannello fisso.
+        // Render del dettaglio SKU dentro il contenitore passato.
         if (!container) {
             return;
         }
 
         const aggiornaRisultatoRicerca = (patch) => {
-            // Se stiamo lavorando nella sezione ricerca,
-            // aggiorniamo anche la lista risultati a sinistra,
-            // così nome, codice e prezzo restano coerenti senza rifare la ricerca.
-            if (window.appFornitore.getSezioneCorrente?.() !== 'ricerca') {
+            // Aggiorno i risultati solo se sto davvero lavorando nel pannello ricerca.
+            if (!isContainerRicerca(container)) {
                 return;
             }
 
@@ -201,9 +162,7 @@ window.skuPage = (function () {
             return;
         }
 
-        // Ogni render riparte da contenitore pulito.
         container.innerHTML = '';
-
         const wrapper = document.createElement('div');
 
         const titolo = document.createElement('h3');
@@ -211,7 +170,6 @@ window.skuPage = (function () {
         titolo.textContent = sku.nome || 'SKU';
         wrapper.appendChild(titolo);
 
-        // Campo "Nome" con modifica inline.
         wrapper.appendChild(creaCampoEditabile({
             etichetta: 'Nome',
             multilinea: false,
@@ -225,17 +183,13 @@ window.skuPage = (function () {
                     { nome: nuovoValore }
                 );
 
-                mostraMessaggioGlobale('SKU aggiornata con successo.', 'success');
+                mostraMessaggioGlobale(container, 'SKU aggiornata con successo.', 'success');
                 await aggiornaListaSkuProdotti();
                 aggiornaRisultatoRicerca({ nome: nuovoValore });
-
-                // Dopo l'update rifacciamo il render completo del dettaglio,
-                // così anche il titolo e gli altri punti dipendenti dal dato aggiornato restano coerenti.
                 renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
         }));
 
-        // Campo "Codice" con validazione numerica.
         wrapper.appendChild(creaCampoEditabileNumero({
             etichetta: 'Codice',
             valoreIniziale: sku.codice,
@@ -251,16 +205,14 @@ window.skuPage = (function () {
                     { codice: Number(nuovoValore) }
                 );
 
-                mostraMessaggioGlobale('SKU aggiornata con successo.', 'success');
+                mostraMessaggioGlobale(container, 'SKU aggiornata con successo.', 'success');
                 await aggiornaListaSkuProdotti();
                 aggiornaRisultatoRicerca({ codice: Number(nuovoValore) });
                 renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
         }));
 
-        // Gestione della fotografia: preview se presente, placeholder altrimenti,
-        // e upload del nuovo file tramite input nascosto.
-        wrapper.appendChild(creaCampoFotoEditabile(sku));
+        wrapper.appendChild(creaCampoFotoEditabile(sku, container));
 
         const titoloDescrizione = document.createElement('h4');
         titoloDescrizione.className = 'section-title';
@@ -269,8 +221,6 @@ window.skuPage = (function () {
         titoloDescrizione.textContent = 'Descrizione tecnica';
         wrapper.appendChild(titoloDescrizione);
 
-        // La descrizione tecnica usa una textarea,
-        // perché può contenere testo più lungo su più righe.
         wrapper.appendChild(creaCampoEditabile({
             etichetta: null,
             multilinea: true,
@@ -284,14 +234,13 @@ window.skuPage = (function () {
                     { descrizioneTecnica: nuovoValore }
                 );
 
-                mostraMessaggioGlobale('SKU aggiornata con successo.', 'success');
+                mostraMessaggioGlobale(container, 'SKU aggiornata con successo.', 'success');
                 await aggiornaListaSkuProdotti();
                 aggiornaRisultatoRicerca({ descrizioneTecnica: nuovoValore });
                 renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
         }));
 
-        // Campo prezzo con formattazione in vista e validazione numerica in edit.
         wrapper.appendChild(creaCampoEditabileNumero({
             etichetta: 'Prezzo',
             valoreIniziale: sku.prezzo,
@@ -308,14 +257,13 @@ window.skuPage = (function () {
                     { prezzo: Number(nuovoValore) }
                 );
 
-                mostraMessaggioGlobale('Prezzo aggiornato con successo.', 'success');
+                mostraMessaggioGlobale(container, 'Prezzo aggiornato con successo.', 'success');
                 await aggiornaListaSkuProdotti();
                 aggiornaRisultatoRicerca({ prezzo: Number(nuovoValore) });
                 renderDettaglioSkuInContainer(stato.skuSelezionata, container);
             }
         }));
 
-        // Riga azioni finali del pannello, al momento dedicata all'eliminazione.
         const azioni = document.createElement('div');
         azioni.className = 'actions-row';
 
@@ -325,8 +273,6 @@ window.skuPage = (function () {
         bottoneElimina.textContent = '-*';
         bottoneElimina.title = 'Elimina SKU';
         bottoneElimina.addEventListener('click', async () => {
-            // Prima dell'eliminazione chiediamo conferma esplicita,
-            // per evitare cancellazioni accidentali.
             const conferma = window.confirm('Vuoi eliminare definitivamente questa SKU?');
             if (!conferma) {
                 return;
@@ -335,24 +281,23 @@ window.skuPage = (function () {
             try {
                 await eliminaSku(sku.id);
 
-                // Se la SKU era stata aperta dalla ricerca,
-                // va tolta anche dalla lista risultati corrente.
-                if (window.appFornitore.getSezioneCorrente?.() === 'ricerca'
-                    && window.ricercaPage
-                    && typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function') {
+                if (
+                    isContainerRicerca(container) &&
+                    window.ricercaPage &&
+                    typeof window.ricercaPage.rimuoviRisultatoDaLista === 'function'
+                ) {
                     window.ricercaPage.rimuoviRisultatoDaLista(sku.id, 'SKU');
                 }
 
-                mostraMessaggioGlobale('SKU eliminata con successo.', 'success');
-
-                // Dopo l'eliminazione il pannello torna allo stato vuoto
-                // e ricarichiamo anche le liste collegate.
+                mostraMessaggioGlobale(container, 'SKU eliminata con successo.', 'success');
+                stato.skuSelezionata = null;
                 renderMessaggioDettaglioVuoto(container);
                 await aggiornaListaSkuProdotti();
             } catch (error) {
                 console.error('[sku.js] errore eliminazione SKU:', error);
 
                 mostraMessaggioGlobale(
+                    container,
                     error.message || 'Errore durante l\'eliminazione della SKU.',
                     'error'
                 );
@@ -361,14 +306,11 @@ window.skuPage = (function () {
 
         azioni.appendChild(bottoneElimina);
         wrapper.appendChild(azioni);
-
         container.appendChild(wrapper);
     }
 
-    function creaCampoEditabile({ etichetta, multilinea, valoreIniziale, onSalva }) {
+    function creaCampoEditabile({ etichetta, multilinea, valoreIniziale, onSalva, containerMessaggi }) {
         // Helper per i campi testuali modificabili inline.
-        // Viene usato sia per campi semplici a una riga,
-        // sia per campi più lunghi in textarea.
         const container = creaContenitoreCampo(etichetta);
 
         const view = creaVistaCampo(
@@ -393,23 +335,19 @@ window.skuPage = (function () {
             },
             getValore: (input) => input.value.trim(),
             onInvio: (input, event) => {
-                // Sul campo singolo, Invio equivale a conferma.
-                // Sulla textarea no, perché lì Invio deve restare disponibile per andare a capo.
+                // Sui campi singoli Invio conferma; sulla textarea no.
                 if (!multilinea && event.key === 'Enter') {
                     event.preventDefault();
                     input.blur();
                 }
             },
-            valida: (nuovoValore) => {
-                // Per i campi testuali qui non imponiamo regole particolari:
-                // l'eventuale validazione più forte resta a carico del server.
-                return {
-                    valido: true,
-                    valoreDaSalvare: nuovoValore
-                };
-            },
+            valida: (nuovoValore) => ({
+                valido: true,
+                valoreDaSalvare: nuovoValore
+            }),
             valoreOriginale: (valoreIniziale ?? '').toString().trim(),
-            onSalva
+            onSalva,
+            containerMessaggi
         });
 
         container.appendChild(view);
@@ -423,10 +361,10 @@ window.skuPage = (function () {
                                           min,
                                           step,
                                           formatView,
-                                          onSalva
+                                          onSalva,
+                                          containerMessaggi
                                       }) {
-        // Variante del campo inline pensata per numeri.
-        // Qui aggiungiamo vincoli come intero/decimale, minimo e passo dell'input.
+        // Variante inline dedicata ai campi numerici.
         const container = creaContenitoreCampo(etichetta);
 
         const testo = formatView
@@ -450,16 +388,12 @@ window.skuPage = (function () {
             },
             getValore: (input) => input.value.trim(),
             onInvio: (input, event) => {
-                // Sui campi numerici Invio conferma sempre la modifica.
                 if (event.key === 'Enter') {
                     event.preventDefault();
                     input.blur();
                 }
             },
             valida: (rawValue) => {
-                // Qui facciamo una validazione client-side un po' più stretta,
-                // perché i numeri sono facili da controllare già nel browser
-                // e conviene dare feedback immediato all'utente.
                 if (rawValue === '') {
                     return {
                         valido: false,
@@ -489,7 +423,8 @@ window.skuPage = (function () {
             },
             valoreOriginale: String(Number(valoreIniziale)),
             confrontaValori: (originale, nuovoValore) => Number(originale) === Number(nuovoValore),
-            onSalva
+            onSalva,
+            containerMessaggi
         });
 
         container.appendChild(view);
@@ -497,8 +432,7 @@ window.skuPage = (function () {
     }
 
     function creaContenitoreCampo(etichetta) {
-        // Struttura base comune dei campi del dettaglio:
-        // wrapper con classe form-group ed eventuale label.
+        // Wrapper base del campo con eventuale label.
         const container = document.createElement('div');
         container.className = 'form-group';
 
@@ -512,8 +446,7 @@ window.skuPage = (function () {
     }
 
     function creaVistaCampo(testo) {
-        // Vista "statica" del campo prima del click.
-        // È un semplice paragrafo stilizzato come testo cliccabile.
+        // Vista statica del campo prima del click.
         const view = document.createElement('p');
         view.className = 'muted';
         view.style.cursor = 'pointer';
@@ -531,31 +464,18 @@ window.skuPage = (function () {
                                     valida,
                                     valoreOriginale,
                                     confrontaValori,
-                                    onSalva
+                                    onSalva,
+                                    containerMessaggi
                                 }) {
-        // Questa è la parte comune del comportamento inline.
-        // Il flusso è sempre lo stesso:
-        // 1. click sul testo;
-        // 2. sostituzione con un input o textarea;
-        // 3. tentativo di salvataggio al blur;
-        // 4. annullamento con Escape;
-        // 5. gestione centralizzata di validazione ed errori.
-        //
-        // In questo modo evitiamo di duplicare la stessa logica
-        // sia nei campi testuali sia in quelli numerici.
+        // Logica comune dell'editor inline.
         view.addEventListener('click', () => {
             const input = creaInput();
 
             const ripristinaVista = () => {
-                // Torna dalla modalità edit alla vista testuale iniziale.
                 container.replaceChild(view, input);
             };
 
             const stessiValori = (nuovoValore) => {
-                // Alcuni campi, come quelli numerici, hanno bisogno
-                // di un confronto personalizzato tra valore vecchio e nuovo.
-                // Se non viene passato un comparatore dedicato,
-                // usiamo il confronto standard tra stringhe.
                 if (typeof confrontaValori === 'function') {
                     return confrontaValori(valoreOriginale, nuovoValore);
                 }
@@ -565,7 +485,6 @@ window.skuPage = (function () {
             const salva = async () => {
                 const valoreLetto = getValore(input);
 
-                // Se il valore non è cambiato, non ha senso chiamare il server.
                 if (stessiValori(valoreLetto)) {
                     ripristinaVista();
                     return;
@@ -573,10 +492,9 @@ window.skuPage = (function () {
 
                 const esitoValidazione = valida(valoreLetto);
 
-                // Se la validazione client fallisce, mostriamo il messaggio
-                // e torniamo alla vista precedente.
                 if (!esitoValidazione.valido) {
                     mostraMessaggioGlobale(
+                        containerMessaggi,
                         esitoValidazione.messaggio || 'Valore non valido.',
                         'error'
                     );
@@ -585,13 +503,12 @@ window.skuPage = (function () {
                 }
 
                 try {
-                    // La logica concreta di salvataggio resta delegata al chiamante,
-                    // così questo helper rimane riusabile per tipi di campo diversi.
                     await onSalva(esitoValidazione.valoreDaSalvare);
                 } catch (error) {
                     console.error('[sku.js] errore aggiornamento campo SKU:', error);
 
                     mostraMessaggioGlobale(
+                        containerMessaggi,
                         error.message || 'Aggiornamento non riuscito.',
                         'error'
                     );
@@ -599,35 +516,27 @@ window.skuPage = (function () {
                 }
             };
 
-            // Il blur è il momento in cui il campo prova a salvare.
             input.addEventListener('blur', salva, { once: true });
 
             input.addEventListener('keydown', (event) => {
-                // Escape annulla la modifica e ripristina la vista precedente.
                 if (event.key === 'Escape') {
                     ripristinaVista();
                     return;
                 }
 
-                // L'eventuale comportamento sul tasto Invio
-                // dipende dal tipo concreto di campo.
                 if (typeof onInvio === 'function') {
                     onInvio(input, event);
                 }
             });
 
-            // Sostituiamo la vista con il campo editabile
-            // e portiamo subito il focus sull'input.
             container.replaceChild(input, view);
             input.focus();
             input.select?.();
         });
     }
 
-    function creaCampoFotoEditabile(sku) {
-        // Campo speciale dedicato alla fotografia.
-        // Diversamente dagli altri campi, qui non c'è testo inline da editare:
-        // mostriamo invece un box cliccabile che apre il file picker.
+    function creaCampoFotoEditabile(sku, containerMessaggi) {
+        // Campo dedicato alla fotografia della SKU.
         const container = document.createElement('div');
         container.className = 'form-group';
 
@@ -641,7 +550,6 @@ window.skuPage = (function () {
         box.title = 'Clicca per cambiare la fotografia';
 
         if (sku.fotografia) {
-            // Se la SKU ha già una foto, mostriamo l'anteprima.
             const img = document.createElement('img');
             img.src = risolviPercorsoFoto(sku.fotografia);
             img.alt = `Foto SKU ${sku.nome || ''}`.trim();
@@ -649,7 +557,6 @@ window.skuPage = (function () {
             img.decoding = 'async';
             box.appendChild(img);
         } else {
-            // In assenza di fotografia mostriamo un placeholder testuale.
             const placeholder = document.createElement('p');
             placeholder.className = 'muted';
             placeholder.textContent = 'Nessuna fotografia. Clicca per caricarne una.';
@@ -661,7 +568,6 @@ window.skuPage = (function () {
         input.accept = 'image/*';
         input.hidden = true;
 
-        // Il click sul box visuale apre l'input file nascosto.
         box.addEventListener('click', () => input.click());
 
         input.addEventListener('change', async () => {
@@ -670,16 +576,15 @@ window.skuPage = (function () {
                 return;
             }
 
-            // Controlli minimi sul file selezionato.
             if (!file.type.startsWith('image/')) {
-                mostraMessaggioGlobale('La fotografia deve essere un file immagine valido.', 'error');
+                mostraMessaggioGlobale(containerMessaggi, 'La fotografia deve essere un file immagine valido.', 'error');
                 input.value = '';
                 return;
             }
 
             const maxSizeBytes = 5 * 1024 * 1024;
             if (file.size > maxSizeBytes) {
-                mostraMessaggioGlobale('La fotografia non può superare 5 MB.', 'error');
+                mostraMessaggioGlobale(containerMessaggi, 'La fotografia non può superare 5 MB.', 'error');
                 input.value = '';
                 return;
             }
@@ -693,22 +598,18 @@ window.skuPage = (function () {
                     { fotografia: aggiornato?.fotografia }
                 );
 
-                mostraMessaggioGlobale('Fotografia aggiornata con successo.', 'success');
+                mostraMessaggioGlobale(containerMessaggi, 'Fotografia aggiornata con successo.', 'success');
                 await aggiornaListaSkuProdotti();
-
-                // Dopo l'upload rifacciamo il render del dettaglio
-                // per mostrare subito la nuova immagine.
-                mostraDettaglioSku(stato.skuSelezionata);
+                renderDettaglioSkuInContainer(stato.skuSelezionata, containerMessaggi);
             } catch (error) {
                 console.error('[sku.js] errore aggiornamento fotografia SKU:', error);
 
                 mostraMessaggioGlobale(
+                    containerMessaggi,
                     error.message || 'Aggiornamento fotografia non riuscito.',
                     'error'
                 );
             } finally {
-                // Puliamo il valore dell'input:
-                // così l'utente può eventualmente riselezionare anche lo stesso file.
                 input.value = '';
             }
         });
@@ -719,13 +620,7 @@ window.skuPage = (function () {
     }
 
     function normalizzaSkuAggiornata(aggiornato, fallback, patch) {
-        // Piccolo helper difensivo per fondere:
-        // - il dato restituito dal server, se presente;
-        // - il vecchio stato locale;
-        // - la patch appena applicata lato client.
-        //
-        // In questo modo il dettaglio resta consistente
-        // anche se il backend restituisce una risposta parziale.
+        // Fonde risposta server, stato precedente e patch locale.
         if (aggiornato && typeof aggiornato === 'object') {
             return { ...fallback, ...aggiornato, ...patch };
         }
@@ -734,8 +629,7 @@ window.skuPage = (function () {
     }
 
     async function aggiornaCampoSku(skuId, campo, valore) {
-        // Chiamata generica per aggiornare un singolo attributo della SKU.
-        // Usiamo x-www-form-urlencoded perché qui inviamo solo valori testuali.
+        // Update di un singolo attributo SKU.
         if (!skuId) {
             throw new Error('SKU non selezionata.');
         }
@@ -750,7 +644,7 @@ window.skuPage = (function () {
             credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
+                Accept: 'application/json'
             },
             body: body.toString()
         });
@@ -759,8 +653,7 @@ window.skuPage = (function () {
     }
 
     async function aggiornaFotoSku(skuId, file) {
-        // Variante dell'update dedicata alla fotografia.
-        // Qui usiamo FormData perché dobbiamo inviare un file binario.
+        // Update della fotografia tramite FormData.
         if (!skuId) {
             throw new Error('SKU non selezionata.');
         }
@@ -780,9 +673,7 @@ window.skuPage = (function () {
     }
 
     async function eliminaSku(skuId) {
-        // Eliminazione completa della SKU tramite endpoint condiviso.
-        // Il server decide poi se bloccare o consentire l'operazione
-        // in base ai vincoli applicativi.
+        // Eliminazione completa della SKU.
         const body = new URLSearchParams();
         body.append('id', skuId);
         body.append('tipo', 'SKU');
@@ -792,7 +683,7 @@ window.skuPage = (function () {
             credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
+                Accept: 'application/json'
             },
             body: body.toString()
         });
@@ -801,8 +692,7 @@ window.skuPage = (function () {
     }
 
     function renderMessaggioDettaglioVuoto(container = dettaglioContent) {
-        // Stato neutro del pannello di destra quando non c'è ancora
-        // nessuna SKU da mostrare o dopo una cancellazione.
+        // Stato neutro del pannello quando non c'è nessuna SKU selezionata.
         if (!container) {
             return;
         }
@@ -815,23 +705,23 @@ window.skuPage = (function () {
     }
 
     function formattaPrezzo(prezzo) {
-        // Formattazione semplice del prezzo per la vista utente.
-        // Se arriva un valore non numerico, mostriamo comunque 0.00
-        // per evitare stringhe strane nell'interfaccia.
+        // Mostra sempre il prezzo con due decimali.
         const numero = Number(prezzo);
         return Number.isNaN(numero) ? '0.00' : numero.toFixed(2);
     }
 
     function risolviPercorsoFoto(fotografia) {
-        // Normalizza il percorso della foto ricevuto dal backend.
-        // Se è già assoluto o parte dalla root, lo lasciamo invariato.
-        // Se invece arriva come semplice nome file, lo facciamo puntare sotto uploads/.
+        // Normalizza il path della fotografia ricevuto dal backend.
         const fotoPath = String(fotografia || '').trim();
         if (!fotoPath) {
             return '';
         }
 
-        if (fotoPath.startsWith('http://') || fotoPath.startsWith('https://') || fotoPath.startsWith('/')) {
+        if (
+            fotoPath.startsWith('http://') ||
+            fotoPath.startsWith('https://') ||
+            fotoPath.startsWith('/')
+        ) {
             return fotoPath;
         }
 
@@ -842,8 +732,6 @@ window.skuPage = (function () {
         return `uploads/${fotoPath}`;
     }
 
-    // Espone all'esterno solo le funzioni davvero necessarie.
-    // Tutto il resto rimane privato al modulo.
     return {
         init,
         renderDettaglioSkuInContainer

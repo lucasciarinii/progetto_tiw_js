@@ -13,13 +13,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Esegue la ricerca lato fornitore su prodotti e SKU.
- *-
+ *
  * Il frontend si aspetta un JSON del tipo:
  * {
  *   "keyword": "...",
@@ -43,7 +43,7 @@ public class RicercaProdottiServlet extends BaseApiServlet {
         String keyword = req.getParameter("keyword");
 
         // La ricerca ha senso solo se arriva una parola chiave non vuota.
-        if (keyword == null || keyword.isBlank()) {
+        if (isBlank(keyword)) {
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                     "Inserisci una parola chiave per cercare prodotti e SKU");
             return;
@@ -87,7 +87,7 @@ public class RicercaProdottiServlet extends BaseApiServlet {
             // L'eventuale logica di wildcard o LIKE resta nel DAO.
             List<SKU> risultatiSku = skuDAO.searchByKeyword(keywordPulita);
 
-            Map<String, Object> risultato = new HashMap<>();
+            Map<String, Object> risultato = new LinkedHashMap<>();
             risultato.put("keyword", keywordPulita);
             risultato.put("prodotti", prodottiCompleti);
             risultato.put("sku", risultatiSku);
@@ -97,5 +97,9 @@ public class RicercaProdottiServlet extends BaseApiServlet {
         } catch (SQLException e) {
             throw new ServletException("Errore durante la ricerca di prodotti e SKU", e);
         }
+    }
+
+    private boolean isBlank(String valore) {
+        return valore == null || valore.isBlank();
     }
 }

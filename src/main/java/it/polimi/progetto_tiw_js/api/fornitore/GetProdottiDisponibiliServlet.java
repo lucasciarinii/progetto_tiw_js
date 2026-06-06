@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * Restituisce i prodotti attualmente disponibili per essere agganciati
  * come figli durante la creazione di un prodotto composto.
- *-
+ *
  * Al frontend basta ricevere i dati essenziali del prodotto,
  * come id, nome, codice e tipo.
  */

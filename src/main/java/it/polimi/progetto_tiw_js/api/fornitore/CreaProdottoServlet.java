@@ -320,7 +320,7 @@ public class CreaProdottoServlet extends BaseApiServlet {
         // quindi il suo codice non deve già esistere.
         if (prodottoDAO.existsByCodice(root.codice)) {
             sendError(resp, HttpServletResponse.SC_CONFLICT,
-                    "Esiste già un prodotto con questo codice");
+                    "Esiste già un prodotto con codice " + root.codice);
             return;
         }
 
@@ -341,12 +341,12 @@ public class CreaProdottoServlet extends BaseApiServlet {
         boolean autoCommitPrecedente = conn.getAutoCommit();
 
         try {
+            conn.setAutoCommit(false);
+
             // Prima applico eventuali eliminazioni richieste dal builder.
             applicaEliminazioni(root, prodottoDAO, skuDAO);
 
-            // Poi apro la transazione per il salvataggio atomico dell'albero finale.
-            conn.setAutoCommit(false);
-
+            // Poi persisto l'albero finale del prodotto composto.
             int rootId = persistiNodoBuilder(root, null, prodottoDAO);
 
             conn.commit();
@@ -356,10 +356,14 @@ public class CreaProdottoServlet extends BaseApiServlet {
             sendJson(resp, prodottoCreato);
 
         } catch (BusinessValidationException e) {
-            conn.rollback();
+            if (!conn.getAutoCommit()) {
+                conn.rollback();
+            }
             sendError(resp, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
         } catch (Exception e) {
-            conn.rollback();
+            if (!conn.getAutoCommit()) {
+                conn.rollback();
+            }
             throw e;
         } finally {
             conn.setAutoCommit(autoCommitPrecedente);

@@ -10,7 +10,7 @@ import java.io.IOException;
 
 /**
  * Invalida la sessione corrente e conferma al client con un JSON.
- * Il redirect alla pagina di login lo gestisce il JS.
+ * Il redirect verso la login viene gestito dal codice JavaScript.
  */
 @WebServlet("/api/logout")
 public class LogoutServlet extends BaseApiServlet {
@@ -18,9 +18,7 @@ public class LogoutServlet extends BaseApiServlet {
     private static final long serialVersionUID = 1L;
 
     @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
-            throws IOException {
-
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         HttpSession session = req.getSession(false);
         if (session != null) {
             session.invalidate();
@@ -28,6 +26,7 @@ public class LogoutServlet extends BaseApiServlet {
 
         JsonObject risposta = new JsonObject();
         risposta.addProperty("messaggio", "Logout effettuato");
+
         sendJson(resp, risposta);
     }
 }

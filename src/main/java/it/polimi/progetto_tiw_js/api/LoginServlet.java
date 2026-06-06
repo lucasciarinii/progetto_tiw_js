@@ -46,6 +46,13 @@ public class LoginServlet extends BaseApiServlet {
                 return;
             }
 
+            // Se esiste già una sessione, la invalido prima di crearne una nuova.
+            // Così evito di riusare una sessione precedente dopo l'autenticazione.
+            HttpSession oldSession = req.getSession(false);
+            if (oldSession != null) {
+                oldSession.invalidate();
+            }
+
             HttpSession session = req.getSession(true);
             session.setAttribute("utente", utente);
 

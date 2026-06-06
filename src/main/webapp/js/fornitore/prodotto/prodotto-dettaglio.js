@@ -1,26 +1,54 @@
 window.prodottoDettaglio = (function () {
     function getState() {
         // Recupera lo stato condiviso del modulo prodotto.
-        // In particolare qui serve soprattutto per accedere al container
-        // principale del pannello di dettaglio.
         return window.prodottoPage.getState();
     }
 
+    function isContainerRicerca(container) {
+        // Capisco il contesto guardando il contenitore reale del dettaglio.
+        return container?.id === 'ricerca-dettaglio';
+    }
+
+    function mostraMessaggioPerContainer(container, messaggio, tipo) {
+        // Il messaggio deve apparire nella stessa sezione del dettaglio attivo.
+        if (isContainerRicerca(container)) {
+            if (window.appFornitore?.mostraMessaggioRicerca) {
+                window.appFornitore.mostraMessaggioRicerca(messaggio, tipo);
+                return;
+            }
+
+            if (window.ricercaPage?.mostraMessaggioRicerca) {
+                window.ricercaPage.mostraMessaggioRicerca(messaggio, tipo);
+                return;
+            }
+        }
+
+        window.appFornitore?.mostraMessaggioHome?.(messaggio, tipo);
+    }
+
+    function mostraErrore(messaggio, container) {
+        mostraMessaggioPerContainer(container, messaggio, 'error');
+    }
+
+    function mostraSuccesso(messaggio, container) {
+        mostraMessaggioPerContainer(container, messaggio, 'success');
+    }
+
     function estraiProdottoAggiornato(risposta) {
-        // Prova a capire dove si trova il prodotto aggiornato nella risposta del server.
-        // Alcune servlet possono restituire direttamente il prodotto,
-        // altre possono incapsularlo dentro una proprietà dedicata.
+        // Prova a individuare il prodotto aggiornato dentro la risposta del server.
         if (!risposta) return null;
         if (risposta.id != null && risposta.tipo) return risposta;
-        if (risposta.prodottoAggiornato && risposta.prodottoAggiornato.id != null) return risposta.prodottoAggiornato;
+        if (risposta.prodottoAggiornato && risposta.prodottoAggiornato.id != null) {
+            return risposta.prodottoAggiornato;
+        }
         return null;
     }
 
     async function refreshContenitoreDaPadre(prodottoId, container) {
-        // Ricarica il dettaglio partendo dall'id del prodotto padre.
-        // Prova prima come semplice e poi come composto:
-        // appena una delle due fetch va a buon fine, aggiorna il pannello.
-        if (!prodottoId || !container) return;
+        // Ricarica il dettaglio del prodotto partendo dal suo id.
+        if (!prodottoId || !container) {
+            return;
+        }
 
         for (const tipo of ['SEMPLICE', 'COMPOSTO']) {
             try {
@@ -28,45 +56,47 @@ window.prodottoDettaglio = (function () {
                 mostraDettaglioProdottoCreato(prodottoAggiornato, container);
                 return;
             } catch (error) {
-                // Se fallisce con un tipo, provo con l'altro.
+                // Se un tentativo fallisce, provo con l'altro tipo.
             }
         }
     }
 
     async function rerenderDaRisposta(risposta, prodottoPadreId, container) {
-        // Dopo un aggiornamento/rimozione il server può restituire direttamente
-        // il prodotto già aggiornato. Se non lo fa, provo a ricaricarlo dal server.
+        // Se il server restituisce già il prodotto aggiornato uso quello,
+        // altrimenti provo a ricaricarlo dal server.
         const prodottoAggiornato = estraiProdottoAggiornato(risposta);
         if (prodottoAggiornato) {
             mostraDettaglioProdottoCreato(prodottoAggiornato, container);
             return;
         }
+
         await refreshContenitoreDaPadre(prodottoPadreId, container);
     }
 
     function mostraDettaglioProdottoCreato(prodotto, container = getState().dettaglioContent) {
         const state = getState();
 
-        // Quando mostro un prodotto nel pannello dettaglio,
-        // chiudo eventuale builder attivo.
+        // Se apro un dettaglio prodotto, chiudo eventuale builder attivo.
         state.builderState = null;
 
         renderDettaglioProdottoInContainer(prodotto, container);
     }
 
     function renderDettaglioProdottoInContainer(prodotto, container) {
-        if (!container) return;
+        if (!container) {
+            return;
+        }
 
-        // Capisco se mi trovo dentro la sezione ricerca:
-        // in quel caso alcune modifiche devono aggiornare anche la lista dei risultati.
-        const inRicerca = window.appFornitore.getSezioneCorrente?.() === 'ricerca';
+        // Se sono nel pannello ricerca, alcune modifiche devono aggiornare
+        // anche la lista risultati mostrata a sinistra.
+        const inRicerca = isContainerRicerca(container);
 
         if (!prodotto) {
             container.innerHTML = '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
             return;
         }
 
-        // Svuoto il pannello e ricostruisco tutto il dettaglio da zero.
+        // Ricostruisco da zero tutto il pannello dettaglio.
         container.innerHTML = '';
         const wrapper = document.createElement('div');
 
@@ -80,7 +110,6 @@ window.prodottoDettaglio = (function () {
             window.prodottoUi.creaRigaCampoProdotto('Nome', prodotto.nome, async (nuovoValore) => {
                 const risposta = await window.prodottoApi.aggiornaCampoProdotto(prodotto.id, 'nome', nuovoValore);
 
-                // Se sono nella sezione ricerca, provo ad aggiornare anche l'elemento della lista risultati.
                 if (inRicerca && window.ricercaPage?.aggiornaRisultatoInLista) {
                     window.ricercaPage.aggiornaRisultatoInLista(prodotto.id, 'PRODOTTO', { nome: nuovoValore });
                 }
@@ -90,7 +119,7 @@ window.prodottoDettaglio = (function () {
             })
         );
 
-        // Campo codice modificabile inline, con una validazione minima lato client.
+        // Campo codice con validazione minima lato client.
         wrapper.appendChild(
             window.prodottoUi.creaRigaCampoProdotto('Codice', prodotto.codice, async (nuovoValore) => {
                 const numero = Number(nuovoValore);
@@ -99,6 +128,11 @@ window.prodottoDettaglio = (function () {
                 }
 
                 const risposta = await window.prodottoApi.aggiornaCampoProdotto(prodotto.id, 'codice', numero);
+
+                if (inRicerca && window.ricercaPage?.aggiornaRisultatoInLista) {
+                    window.ricercaPage.aggiornaRisultatoInLista(prodotto.id, 'PRODOTTO', { codice: numero });
+                }
+
                 await rerenderDaRisposta(risposta, prodotto.id, container);
                 await window.prodottoApi.caricaProdottiDisponibili();
             })
@@ -108,7 +142,6 @@ window.prodottoDettaglio = (function () {
         tipo.innerHTML = `Tipo: ${window.prodottoUi.escapeHtml(prodotto.tipo)}`;
         wrapper.appendChild(tipo);
 
-        // Da qui in poi il rendering diverge in base al tipo di prodotto.
         if (prodotto.tipo === 'SEMPLICE') {
             renderBloccoSkuProdottoSemplice(wrapper, prodotto, container);
         } else {
@@ -119,7 +152,7 @@ window.prodottoDettaglio = (function () {
         azioni.className = 'actions-row';
         azioni.style.marginTop = '1rem';
 
-        // Pulsante per eliminare l'intero prodotto.
+        // Pulsante di eliminazione dell'intero prodotto.
         const bottoneElimina = document.createElement('button');
         bottoneElimina.type = 'button';
         bottoneElimina.className = 'btn btn-action btn-danger btn-sm';
@@ -127,37 +160,35 @@ window.prodottoDettaglio = (function () {
         bottoneElimina.title = 'Elimina prodotto';
         bottoneElimina.addEventListener('click', async () => {
             const conferma = window.confirm('Vuoi eliminare questo prodotto?');
-            if (!conferma) return;
+            if (!conferma) {
+                return;
+            }
 
             try {
-                // Se il prodotto è composto provo prima a prendere il sottoalbero completo,
-                // così nella sezione ricerca posso rimuovere tutti i risultati coinvolti.
+                // Se il prodotto è composto provo a recuperare il sottoalbero completo,
+                // utile soprattutto per aggiornare la sezione ricerca.
                 const sottoalbero = prodotto.tipo === 'COMPOSTO'
                     ? await window.prodottoApi.caricaDettaglioProdotto(prodotto.id, prodotto.tipo).catch(() => null)
                     : null;
 
                 await window.prodottoApi.eliminaOggetto(prodotto.id, prodotto.tipo);
 
-                // Aggiorno eventuale lista risultati della ricerca.
                 if (inRicerca && window.ricercaPage?.rimuoviRisultatiSottoalbero && sottoalbero) {
                     window.ricercaPage.rimuoviRisultatiSottoalbero(sottoalbero);
                 } else if (inRicerca && window.ricercaPage?.rimuoviRisultatoDaLista) {
                     window.ricercaPage.rimuoviRisultatoDaLista(prodotto.id, 'PRODOTTO');
                 }
 
-                // Dopo l'eliminazione svuoto il pannello dettaglio.
                 container.innerHTML = '<p class="muted">Seleziona o crea un elemento per vedere il dettaglio.</p>';
 
-                // Ricarico le liste principali per mantenere coerente la home.
                 await Promise.all([
                     window.prodottoApi.caricaProdottiDisponibili(),
                     window.prodottoApi.caricaSkuDisponibili()
                 ]);
+
+                mostraSuccesso('Prodotto eliminato con successo.', container);
             } catch (error) {
-                window.prodottoPage.mostraMessaggioGlobale(
-                    error.message || 'Errore durante l\'eliminazione del prodotto.',
-                    'error'
-                );
+                mostraErrore(error.message || 'Errore durante l\'eliminazione del prodotto.', container);
             }
         });
 
@@ -167,7 +198,7 @@ window.prodottoDettaglio = (function () {
     }
 
     function renderBloccoSkuProdottoSemplice(wrapper, prodotto, container) {
-        // Render della sezione SKU per un prodotto semplice.
+        // Sezione SKU del prodotto semplice.
         const titoloSku = document.createElement('h4');
         titoloSku.className = 'section-title';
         titoloSku.style.fontSize = '0.95rem';
@@ -183,14 +214,13 @@ window.prodottoDettaglio = (function () {
             return;
         }
 
-        // Per ogni SKU associata creo una riga di dettaglio.
         prodotto.skuList.forEach((sku) => {
             wrapper.appendChild(renderRigaSkuDettaglio(sku, prodotto, container));
         });
     }
 
     function renderBloccoProdottoComposto(wrapper, prodotto, container) {
-        // Campi specifici del prodotto composto, tutti editabili inline.
+        // Campi specifici del prodotto composto.
         wrapper.appendChild(
             window.prodottoUi.creaRigaCampoProdotto('Descrizione', prodotto.descrizione, async (nuovoValore) => {
                 const risposta = await window.prodottoApi.aggiornaCampoProdotto(prodotto.id, 'descrizione', nuovoValore);
@@ -233,7 +263,6 @@ window.prodottoDettaglio = (function () {
         const blocco = document.createElement('div');
         blocco.style.marginTop = '0.75rem';
 
-        // Render ricorsivo dei figli del prodotto composto.
         prodotto.figli.forEach((figlio) => {
             blocco.appendChild(renderNodoDettaglioProdotto(figlio, prodotto.id, container));
         });
@@ -242,12 +271,11 @@ window.prodottoDettaglio = (function () {
     }
 
     function renderNodoDettaglioProdotto(nodo, padreId, container) {
-        // Render di un singolo nodo dell'albero nel dettaglio.
+        // Render di un nodo dell'albero prodotto.
         const card = document.createElement('div');
         card.className = 'tree-node';
         card.style.marginTop = '0.75rem';
 
-        // Anche il nome del sottoprodotto è modificabile inline.
         card.appendChild(
             window.prodottoUi.creaRigaCampoProdotto('Nome', nodo.nome, async (nuovoValore) => {
                 const risposta = await window.prodottoApi.aggiornaCampoProdotto(nodo.id, 'nome', nuovoValore);
@@ -256,16 +284,25 @@ window.prodottoDettaglio = (function () {
             })
         );
 
-        const codice = document.createElement('p');
-        codice.innerHTML = `Codice: ${window.prodottoUi.escapeHtml(nodo.codice)}`;
-        card.appendChild(codice);
+        card.appendChild(
+            window.prodottoUi.creaRigaCampoProdotto('Codice', nodo.codice, async (nuovoValore) => {
+                const numero = Number(nuovoValore);
+                if (!Number.isInteger(numero) || numero < 0) {
+                    throw new Error('Il codice del prodotto deve essere un intero non negativo.');
+                }
+
+                const risposta = await window.prodottoApi.aggiornaCampoProdotto(nodo.id, 'codice', numero);
+                await rerenderDaRisposta(risposta, padreId, container);
+                await window.prodottoApi.caricaProdottiDisponibili();
+            })
+        );
 
         const tipo = document.createElement('p');
         tipo.innerHTML = `Tipo: ${window.prodottoUi.escapeHtml(nodo.tipo)}`;
         card.appendChild(tipo);
 
         if (nodo.tipo === 'COMPOSTO') {
-            // Se il nodo è composto, mostro e rendo editabili anche i suoi campi specifici.
+            // Campi specifici del sottoprodotto composto.
             card.appendChild(
                 window.prodottoUi.creaRigaCampoProdotto('Descrizione', nodo.descrizione, async (nuovoValore) => {
                     const risposta = await window.prodottoApi.aggiornaCampoProdotto(nodo.id, 'descrizione', nuovoValore);
@@ -273,6 +310,7 @@ window.prodottoDettaglio = (function () {
                     await window.prodottoApi.caricaProdottiDisponibili();
                 })
             );
+
             card.appendChild(
                 window.prodottoUi.creaRigaCampoProdotto('Prezzo minimo', window.prodottoUi.formattaPrezzo(nodo.prezzoMin), async (nuovoValore) => {
                     const risposta = await window.prodottoApi.aggiornaCampoProdotto(nodo.id, 'prezzoMin', nuovoValore);
@@ -280,6 +318,7 @@ window.prodottoDettaglio = (function () {
                     await window.prodottoApi.caricaProdottiDisponibili();
                 })
             );
+
             card.appendChild(
                 window.prodottoUi.creaRigaCampoProdotto('Prezzo massimo', window.prodottoUi.formattaPrezzo(nodo.prezzoMax), async (nuovoValore) => {
                     const risposta = await window.prodottoApi.aggiornaCampoProdotto(nodo.id, 'prezzoMax', nuovoValore);
@@ -294,45 +333,60 @@ window.prodottoDettaglio = (function () {
         azioni.style.marginTop = '0.75rem';
 
         if (padreId != null) {
-            // Pulsante "-" = scollega il figlio dal padre, ma non lo elimina dal sistema.
+            // "-" scollega il figlio dal padre senza eliminarlo dal sistema.
             const btnRimuovi = document.createElement('button');
             btnRimuovi.type = 'button';
             btnRimuovi.className = 'btn btn-action btn-warning btn-sm';
             btnRimuovi.textContent = '-';
             btnRimuovi.addEventListener('click', async () => {
                 const conferma = window.confirm('Vuoi scollegare questo sottoprodotto?');
-                if (!conferma) return;
+                if (!conferma) {
+                    return;
+                }
 
-                const risposta = await window.prodottoApi.rimuoviAssociazionePadreFiglio(nodo.id, padreId);
-                await rerenderDaRisposta(risposta, padreId, container);
-                await window.prodottoApi.caricaProdottiDisponibili();
+                try {
+                    const risposta = await window.prodottoApi.rimuoviAssociazionePadreFiglio(nodo.id, padreId);
+                    await rerenderDaRisposta(risposta, padreId, container);
+                    await window.prodottoApi.caricaProdottiDisponibili();
+                    mostraSuccesso('Sottoprodotto scollegato con successo.', container);
+                } catch (error) {
+                    mostraErrore(error.message || 'Impossibile scollegare il sottoprodotto.', container);
+                }
             });
             azioni.appendChild(btnRimuovi);
         }
 
-        // Pulsante "-*" = elimina del tutto il nodo.
+        // "-*" elimina del tutto il prodotto.
         const btnElimina = document.createElement('button');
         btnElimina.type = 'button';
         btnElimina.className = 'btn btn-action btn-danger btn-sm';
         btnElimina.textContent = '-*';
         btnElimina.addEventListener('click', async () => {
             const conferma = window.confirm('Vuoi eliminare questo prodotto?');
-            if (!conferma) return;
+            if (!conferma) {
+                return;
+            }
 
-            await window.prodottoApi.eliminaOggetto(nodo.id, nodo.tipo, padreId);
-            await refreshContenitoreDaPadre(padreId, container);
+            try {
+                await window.prodottoApi.eliminaOggetto(nodo.id, nodo.tipo, padreId);
+                await refreshContenitoreDaPadre(padreId, container);
 
-            await Promise.all([
-                window.prodottoApi.caricaProdottiDisponibili(),
-                window.prodottoApi.caricaSkuDisponibili()
-            ]);
+                await Promise.all([
+                    window.prodottoApi.caricaProdottiDisponibili(),
+                    window.prodottoApi.caricaSkuDisponibili()
+                ]);
+
+                mostraSuccesso('Prodotto eliminato con successo.', container);
+            } catch (error) {
+                mostraErrore(error.message || 'Errore durante l\'eliminazione del prodotto.', container);
+            }
         });
 
         azioni.appendChild(btnElimina);
         card.appendChild(azioni);
 
         if (nodo.tipo === 'SEMPLICE') {
-            // Se il nodo è semplice, mostro la lista delle SKU associate.
+            // Elenco SKU associate al sottoprodotto semplice.
             const bloccoSku = document.createElement('div');
             bloccoSku.style.marginTop = '0.85rem';
 
@@ -351,7 +405,7 @@ window.prodottoDettaglio = (function () {
         }
 
         if (nodo.tipo === 'COMPOSTO' && Array.isArray(nodo.figli) && nodo.figli.length > 0) {
-            // Se il nodo è composto, continuo il render dell'albero in profondità.
+            // Render ricorsivo dei figli.
             const figliWrap = document.createElement('div');
             figliWrap.style.marginTop = '0.85rem';
             figliWrap.style.paddingLeft = '1rem';
@@ -367,22 +421,23 @@ window.prodottoDettaglio = (function () {
     }
 
     function renderRigaSkuDettaglio(sku, prodottoPadre, container) {
-        // Render della riga di una SKU nel dettaglio del prodotto semplice.
+        // Render di una SKU nel dettaglio del prodotto semplice.
         const riga = document.createElement('div');
         riga.className = 'tree-sku-row';
 
         const info = document.createElement('div');
         info.className = 'tree-meta';
 
-        // I campi principali della SKU sono modificabili inline.
         info.appendChild(window.prodottoUi.creaRigaCampoSku('Codice', sku.codice, async (valore) => {
             const aggiornato = await window.prodottoApi.aggiornaCampoSku(sku.id, 'codice', valore);
             await rerenderDaRisposta(aggiornato, prodottoPadre.id, container);
         }));
+
         info.appendChild(window.prodottoUi.creaRigaCampoSku('Nome', sku.nome, async (valore) => {
             const aggiornato = await window.prodottoApi.aggiornaCampoSku(sku.id, 'nome', valore);
             await rerenderDaRisposta(aggiornato, prodottoPadre.id, container);
         }));
+
         info.appendChild(window.prodottoUi.creaRigaCampoSku('Prezzo', window.prodottoUi.formattaPrezzo(sku.prezzo), async (valore) => {
             const aggiornato = await window.prodottoApi.aggiornaCampoSku(sku.id, 'prezzo', valore);
             await rerenderDaRisposta(aggiornato, prodottoPadre.id, container);
@@ -391,40 +446,56 @@ window.prodottoDettaglio = (function () {
         const azioni = document.createElement('div');
         azioni.className = 'tree-actions';
 
-        // "-" = rimuove l'associazione SKU-prodotto semplice.
+        // "-" rimuove l'associazione tra SKU e prodotto semplice.
         const btnRimuovi = document.createElement('button');
         btnRimuovi.type = 'button';
         btnRimuovi.className = 'btn btn-action btn-warning btn-sm';
         btnRimuovi.textContent = '-';
         btnRimuovi.addEventListener('click', async () => {
             const conferma = window.confirm('Vuoi rimuovere questa SKU dal prodotto semplice?');
-            if (!conferma) return;
+            if (!conferma) {
+                return;
+            }
 
-            const risposta = await window.prodottoApi.rimuoviAssociazioneProdottoSku(prodottoPadre.id, sku.id);
-            await rerenderDaRisposta(risposta, prodottoPadre.id, container);
+            try {
+                const risposta = await window.prodottoApi.rimuoviAssociazioneProdottoSku(prodottoPadre.id, sku.id);
+                await rerenderDaRisposta(risposta, prodottoPadre.id, container);
 
-            await Promise.all([
-                window.prodottoApi.caricaProdottiDisponibili(),
-                window.prodottoApi.caricaSkuDisponibili()
-            ]);
+                await Promise.all([
+                    window.prodottoApi.caricaProdottiDisponibili(),
+                    window.prodottoApi.caricaSkuDisponibili()
+                ]);
+
+                mostraSuccesso('Associazione SKU rimossa con successo.', container);
+            } catch (error) {
+                mostraErrore(error.message || 'Impossibile rimuovere la SKU dal prodotto semplice.', container);
+            }
         });
 
-        // "-*" = elimina definitivamente la SKU.
+        // "-*" elimina definitivamente la SKU.
         const btnElimina = document.createElement('button');
         btnElimina.type = 'button';
         btnElimina.className = 'btn btn-action btn-danger btn-sm';
         btnElimina.textContent = '-*';
         btnElimina.addEventListener('click', async () => {
             const conferma = window.confirm('Vuoi eliminare definitivamente questa SKU?');
-            if (!conferma) return;
+            if (!conferma) {
+                return;
+            }
 
-            await window.prodottoApi.eliminaOggetto(sku.id, 'SKU', prodottoPadre.id);
-            await refreshContenitoreDaPadre(prodottoPadre.id, container);
+            try {
+                await window.prodottoApi.eliminaOggetto(sku.id, 'SKU', prodottoPadre.id);
+                await refreshContenitoreDaPadre(prodottoPadre.id, container);
 
-            await Promise.all([
-                window.prodottoApi.caricaProdottiDisponibili(),
-                window.prodottoApi.caricaSkuDisponibili()
-            ]);
+                await Promise.all([
+                    window.prodottoApi.caricaProdottiDisponibili(),
+                    window.prodottoApi.caricaSkuDisponibili()
+                ]);
+
+                mostraSuccesso('SKU eliminata con successo.', container);
+            } catch (error) {
+                mostraErrore(error.message || 'Errore durante l\'eliminazione della SKU.', container);
+            }
         });
 
         azioni.appendChild(btnRimuovi);
@@ -436,7 +507,6 @@ window.prodottoDettaglio = (function () {
     }
 
     return {
-        // Metodi pubblici esposti agli altri moduli.
         estraiProdottoAggiornato,
         rerenderDaRisposta,
         mostraDettaglioProdottoCreato,

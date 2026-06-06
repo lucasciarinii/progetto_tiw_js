@@ -13,7 +13,7 @@ import java.sql.SQLException;
 
 /**
  * Restituisce il dettaglio completo di un prodotto.
- *-
+ *
  * Questa servlet viene usata sia nella home del fornitore sia nella ricerca:
  * - per un prodotto semplice serve anche la lista delle SKU associate;
  * - per un prodotto composto serve il sottoalbero dei sottoprodotti.
@@ -57,7 +57,7 @@ public class GetDettaglioProdottoServlet extends BaseApiServlet {
             return;
         }
 
-        String tipo = tipoParam.trim().toUpperCase();
+        String tipo = normalizeUpper(tipoParam);
 
         // I soli tipi ammessi sono semplice e composto.
         if (!"SEMPLICE".equals(tipo) && !"COMPOSTO".equals(tipo)) {
@@ -86,7 +86,7 @@ public class GetDettaglioProdottoServlet extends BaseApiServlet {
 
             // Controllo difensivo: il tipo richiesto dal client deve essere
             // coerente con il tipo reale del prodotto trovato nel database.
-            if (!tipo.equalsIgnoreCase(prodotto.getTipo())) {
+            if (!tipo.equals(normalizeUpper(prodotto.getTipo()))) {
                 sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
                         "Il tipo richiesto non corrisponde al prodotto");
                 return;
@@ -106,5 +106,13 @@ public class GetDettaglioProdottoServlet extends BaseApiServlet {
      */
     private boolean isBlank(String valore) {
         return valore == null || valore.isBlank();
+    }
+
+    /**
+     * Normalizza una stringa in maiuscolo dopo trim.
+     * Se arriva null restituisce stringa vuota.
+     */
+    private String normalizeUpper(String valore) {
+        return valore == null ? "" : valore.trim().toUpperCase();
     }
 }
