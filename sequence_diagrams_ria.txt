@@ -1,1 +1,64 @@
-sequence_diagrams_ria
+GENERALE =======================================================================
+=======================================================================
+=======================================================================
+CheckLogin ---------------------------------------------------------------------------------------------
+actor Utente
+participant "Browser\n(login.js)" as JS
+participant "CheckLogin\n(Servlet)" as Servlet
+participant "UtenteDAO" as DAO
+
+Utente->JS: compila form e preme "Accedi"
+
+alt campi vuoti (validazione client)
+  JS->JS: mostra errore nel form
+else campi validi
+  JS->Servlet: POST /api/check-login\n[username, password]
+
+  alt parametri mancanti o non validi
+    Servlet-->JS: errore
+    JS->JS: mostra errore nel form
+  else parametri validi
+    Servlet->DAO: checkCredentials(username, password)
+    DAO-->Servlet: Utente | null
+
+    alt credenziali non valide
+      Servlet-->JS: errore
+      JS->JS: mostra errore nel form
+    else credenziali corrette
+      Servlet->Servlet: invalida sessione precedente\ncrea nuova sessione con utente
+      Servlet-->JS: ok { ruolo, nome, cognome }
+
+      alt ruolo = "FORNITORE"
+        JS->JS: window.location.href = "fornitore.html"
+      else ruolo = "CLIENTE"
+        JS->JS: window.location.href = "cliente.html"
+      end
+    end
+  end
+end
+
+Logout ---------------------------------------------------------------------------------------------
+actor Utente
+participant "Browser\n(main.js)" as JS
+participant "Logout\n(Servlet)" as Servlet
+
+Utente->JS: click su "Logout"
+JS->Servlet: POST /api/logout
+
+Servlet->Servlet: invalida sessione corrente
+Servlet-->JS: ok
+
+JS->JS: window.location.href = "index.html"
+
+
+
+
+
+
+CLIENTE =======================================================================
+=======================================================================
+=======================================================================
+
+FORNITORE =======================================================================
+=======================================================================
+=======================================================================
