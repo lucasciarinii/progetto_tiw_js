@@ -549,9 +549,227 @@ else keyword valida
 end
 @enduml
 
-Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+Click su risultato da ricerca:-----------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "ricerca.js" as Ricerca
+participant "prodotto-api.js" as ProdottoApi
+participant "GetDettaglioProdottoServlet" as GetDettaglioProdotto
+participant "sku.js" as Sku
+participant "prodotto.js" as Prodotto
+
+Fornitore -> Home: click su una singola entry nei risultati
+Home -> Ricerca: selezionaRisultato(item)
+
+Ricerca -> Ricerca: aggiorna stato.selezionato
+Ricerca -> Ricerca: reset dettaglioCompleto
+Ricerca -> Ricerca: renderRisultati()
+Ricerca -> Home: mostra placeholder nel pannello dettaglio
+
+alt entry di tipo SKU
+    Ricerca -> Ricerca: usa i dati già presenti nel risultato
+    Ricerca -> Ricerca: stato.dettaglioCompleto = item.raw || item
+    Ricerca -> Sku: renderDettaglioSkuInContainer(sku, ricerca-dettaglio)
+    Sku -> Home: mostra dettaglio SKU nel pannello
+else entry di tipo PRODOTTO
+    Ricerca -> ProdottoApi: caricaDettaglioProdotto(item.id, item.tipo)
+    ProdottoApi -> GetDettaglioProdotto: GET dettaglio prodotto
+
+    alt risposta ok
+        GetDettaglioProdotto --> ProdottoApi: dettaglio completo
+        ProdottoApi --> Ricerca: dettaglio completo
+        Ricerca -> Ricerca: stato.dettaglioCompleto = dettaglio
+        Ricerca -> Prodotto: renderDettaglioProdottoInContainer(prodotto, ricerca-dettaglio)
+        Prodotto -> Home: mostra dettaglio prodotto nel pannello
+    else errore
+        GetDettaglioProdotto --> ProdottoApi: errore
+        ProdottoApi --> Ricerca: errore
+        Ricerca -> Ricerca: mostraMessaggioRicerca(errore)
+        Ricerca -> Prodotto: renderDettaglioProdottoInContainer(item.raw || item, ricerca-dettaglio)
+        Prodotto -> Home: mostra dettaglio fallback nel pannello
+    end
+end
+@enduml
+
+Click tasto -* (in builder) :-------------------------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "prodotto-builder.js" as Builder
+participant "prodotto.js" as ProdottoPage
+
+Fornitore -> Home: clicca "-*" su un nodo del builder
+Home -> Builder: click bottoneElimina
+
+Builder -> ProdottoPage: getState()
+Builder -> Builder: trovaNodoBuilder(builderState, clientId)
+
+alt nodo trovato
+    Builder -> Home: conferma eliminazione nodo e discendenti
+
+    alt conferma OK
+        Builder -> Builder: registraEliminazioneProdotto(nodo)
+        Builder -> Builder: removeNodeByClientId(builderState, clientId)
+        Builder -> Builder: renderBuilder()
+        Builder -> Home: aggiorna pannello builder
+    else conferma annullata
+    end
+else nodo non trovato
+end
+@enduml
+
+Click tasto -* (in dettaglio) :-------------------------------------------------------------------------
+VERSIONE NO ERRORI:
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "sku.js" as Sku
+participant "prodotto-dettaglio.js" as ProdottoDettaglio
+participant "prodotto-api.js" as ProdottoApi
+participant "EliminaOggettoServlet" as EliminaOggetto
+participant "ProdottoDAO" as ProdottoDAO
+participant "SKUDAO" as SKUDAO
+participant "ricerca.js" as Ricerca
+
+Fornitore -> Home: click su "-*" nel pannello dettaglio
+
+alt dettaglio SKU
+    Home -> Sku: click bottoneElimina
+    Sku -> Home: conferma eliminazione
+    Sku -> Sku: eliminaSku(sku.id)
+    Sku -> EliminaOggetto: POST api/fornitore/oggetto/elimina
+    EliminaOggetto -> ProdottoDAO: verifica vincolo ultima SKU
+    EliminaOggetto -> SKUDAO: deleteSKU(skuId)
+    SKUDAO --> EliminaOggetto: ok
+    EliminaOggetto --> Sku: ok
+    Sku -> Ricerca: aggiorna lista risultati
+    Sku -> Home: svuota dettaglio + messaggio successo
+
+else dettaglio PRODOTTO
+    Home -> ProdottoDettaglio: click bottoneElimina
+    ProdottoDettaglio -> Home: conferma eliminazione
+    ProdottoDettaglio -> ProdottoApi: eliminaOggetto(id, tipo, returnProdottoId?)
+    ProdottoApi -> EliminaOggetto: POST api/fornitore/oggetto/elimina
+
+    alt tipo SEMPLICE
+        EliminaOggetto -> ProdottoDAO: deleteProdotto(id)
+    else tipo COMPOSTO
+        EliminaOggetto -> ProdottoDAO: deleteProdottoConDiscendenti(id)
+    end
+
+    ProdottoDAO --> EliminaOggetto: ok
+    EliminaOggetto --> ProdottoApi: ok
+    ProdottoApi --> ProdottoDettaglio: ok
+
+    alt dettaglio in ricerca
+        ProdottoDettaglio -> Ricerca: rimuovi risultati / sottoalbero
+    end
+
+    ProdottoDettaglio -> Home: svuota dettaglio
+    ProdottoDettaglio -> ProdottoApi: caricaProdottiDisponibili() + caricaSkuDisponibili()
+    ProdottoDettaglio -> Home: mostra messaggio successo
+end
+@enduml
+
+VERSIONE CON ERRORI GENERALIZZZATI:
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "sku.js" as Sku
+participant "prodotto-dettaglio.js" as ProdottoDettaglio
+participant "prodotto-api.js" as ProdottoApi
+participant "EliminaOggettoServlet" as EliminaOggetto
+participant "ProdottoDAO" as ProdottoDAO
+participant "SKUDAO" as SKUDAO
+participant "ricerca.js" as Ricerca
+
+Fornitore -> Home: click su "-*" nel pannello dettaglio
+
+alt dettaglio SKU
+    Home -> Sku: click bottoneElimina
+    Sku -> Home: conferma eliminazione
+    Sku -> Sku: eliminaSku(sku.id)
+    Sku -> EliminaOggetto: POST api/fornitore/oggetto/elimina
+
+    alt eliminazione consentita
+        EliminaOggetto -> ProdottoDAO: verifica vincolo ultima SKU
+        EliminaOggetto -> SKUDAO: deleteSKU(skuId)
+        SKUDAO --> EliminaOggetto: ok
+        EliminaOggetto --> Sku: ok
+
+        alt dettaglio aperto in ricerca
+            Sku -> Ricerca: rimuoviRisultatoDaLista(sku.id, "SKU")
+        end
+
+        Sku -> Home: svuota dettaglio
+        Sku -> Sku: aggiornaListaSkuProdotti()
+        Sku -> Home: mostra messaggio successo
+
+    else errore validazione / vincolo / server
+        EliminaOggetto --> Sku: errore
+        Sku -> Home: mostra messaggio errore
+    end
+
+else dettaglio PRODOTTO
+    Home -> ProdottoDettaglio: click bottoneElimina
+    ProdottoDettaglio -> Home: conferma eliminazione
+    ProdottoDettaglio -> ProdottoApi: eliminaOggetto(id, tipo, returnProdottoId?)
+    ProdottoApi -> EliminaOggetto: POST api/fornitore/oggetto/elimina
+
+    alt eliminazione consentita
+        alt tipo SEMPLICE
+            EliminaOggetto -> ProdottoDAO: deleteProdotto(id)
+        else tipo COMPOSTO
+            EliminaOggetto -> ProdottoDAO: deleteProdottoConDiscendenti(id)
+        end
+
+        ProdottoDAO --> EliminaOggetto: ok
+        EliminaOggetto --> ProdottoApi: ok
+        ProdottoApi --> ProdottoDettaglio: ok
+
+        alt dettaglio in ricerca
+            ProdottoDettaglio -> Ricerca: rimuovi risultati / sottoalbero
+        end
+
+        ProdottoDettaglio -> Home: svuota dettaglio
+        ProdottoDettaglio -> ProdottoApi: caricaProdottiDisponibili() + caricaSkuDisponibili()
+        ProdottoDettaglio -> Home: mostra messaggio successo
+
+    else errore validazione / vincolo / server
+        EliminaOggetto --> ProdottoApi: errore
+        ProdottoApi --> ProdottoDettaglio: errore
+        ProdottoDettaglio -> Home: mostra messaggio errore
+    end
+end
+@enduml
+
+Click tasto - (in builder) :--------------------------------------------------------------------------
 
 
-Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+Click tasto - (in dettaglio) :-------------------------------------------------------------------------
+
+
+Click tasto + :-------------------------------------------------------------------------
+
+
+Click tasto Annulla Bozza :-------------------------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "prodotto-builder.js" as Builder
+participant "prodotto.js" as ProdottoPage
+
+Fornitore -> Home: clicca "Annulla bozza"
+Home -> Builder: click bottoneAnnulla
+Builder -> ProdottoPage: getState()
+Builder -> Home: mostra conferma annullamento bozza
+
+alt conferma OK
+    Builder -> ProdottoPage: builderState = null
+    Builder -> Home: aggiorna dettaglioContent con messaggio vuoto
+else conferma annullata
+end
+@enduml
 
 
