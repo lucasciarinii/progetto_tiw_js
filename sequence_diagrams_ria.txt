@@ -490,11 +490,64 @@ else bozza presente
 end
 @enduml
 
-Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+Click tasto Ricerca Prodotti:-----------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "main.js" as Main
+participant "ricerca.js" as Ricerca
 
+Fornitore -> Home: click su "Ricerca prodotti"
+Home -> Main: click link-ricerca-prodotti
+Main -> Main: preventDefault()
+Main -> Main: nascondiMessaggi()
+Main -> Main: mostraSezione("ricerca")
+Main -> Home: nasconde sezione-home
+Main -> Home: mostra sezione-ricerca
+Main -> Main: aggiorna statoPagina.sezioneCorrente = "ricerca"
+Main -> Home: focus su input-ricerca
+@enduml
 
-Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+Click tasto Cerca in Ricerca Prodotti:-----------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "ricerca.js" as Ricerca
+participant "main.js " as Main
+participant "RicercaProdotti" as RicercaServlet
+participant "ProdottoDAO" as ProdottoDAO
+participant "SKUDAO" as SKUDAO
 
+Fornitore -> Home: click su "Cerca"
+Home -> Ricerca: onClickCerca()
+
+Ricerca -> Ricerca: nascondiMessaggiRicerca()
+Ricerca -> Ricerca: legge keyword dall'input
+
+alt keyword vuota
+    Ricerca -> Ricerca: mostraMessaggioRicerca(errore)
+else keyword valida
+    Ricerca -> RicercaServlet: GET api/fornitore/ricerca?keyword=...
+    RicercaServlet -> RicercaServlet: controlla sessione e ruolo
+    RicercaServlet -> ProdottoDAO: searchByKeyword(keyword)
+    ProdottoDAO --> RicercaServlet: prodotti trovati
+    RicercaServlet -> SKUDAO: searchByKeyword(keyword)
+    SKUDAO --> RicercaServlet: SKU trovate
+    RicercaServlet --> Ricerca: JSON con prodotti e SKU
+
+    alt errore server
+        Ricerca -> Main: parseJsonResponse(response)
+        Main --> Ricerca: eccezione
+        Ricerca -> Ricerca: mostraMessaggioRicerca(errore)
+    else risposta ok
+        Ricerca -> Ricerca: normalizzaRisultati(data)
+        Ricerca -> Ricerca: aggiorna stato.risultati
+        Ricerca -> Ricerca: reset selezionato e dettaglioCompleto
+        Ricerca -> Ricerca: renderRisultati()
+        Ricerca -> Ricerca: renderDettaglioVuoto()
+    end
+end
+@enduml
 
 Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
 
