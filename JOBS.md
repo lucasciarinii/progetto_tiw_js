@@ -64,10 +64,15 @@
 
 | File | Responsabilità |
 |------|----------------|
-| `main.js` | Init pagina, verifica sessione, navigazione tra #sezione-home e #sezione-ricerca, logout |
+| `main.js` | Init pagina, verifica sessione, navigazione tra `#sezione-home` e `#sezione-ricerca`, logout |
 | `sku.js` | Fetch crea SKU, render dettaglio SKU con inline edit (click → input → blur → salva) |
-| `prodotto.js` | Costruzione albero prodotto nel DOM, bottoni +/-/-*, SALVA PRODOTTO (unica chiamata server) |
-| `ricerca.js` | Fetch ricerca, render risultati (result-list), click → dettaglio, modifica inline attributi |
+| `prodotto.js` | Modulo principale della gestione prodotti: stato condiviso, init della sezione home prodotto, recupero riferimenti DOM, avvio caricamento dati iniziali e coordinamento degli altri moduli |
+| `prodotto-api-2.js` | Chiamate HTTP della sezione prodotti: caricamento SKU disponibili, prodotti disponibili, dettaglio prodotto, aggiornamenti inline, rimozione associazioni, eliminazione oggetti |
+| `prodotto-builder-3.js` | Logica del builder client-side del prodotto composto: struttura ad albero, aggiunta/rimozione nodi e SKU, validazione bozza, serializzazione payload e salvataggio finale |
+| `prodotto-dettaglio-4.js` | Render del pannello dettaglio prodotto, gestione modifiche inline, aggiornamento del dettaglio dopo le operazioni e azioni di eliminazione/rimozione nel pannello destro |
+| `prodotto-form-5.js` | Gestione dei form di creazione prodotto semplice e composto: bind eventi, validazione lato client, submit, creazione della bozza iniziale del composto e refresh delle liste |
+| `prodotto-ui-6.js` | Utility UI condivise per la sezione prodotti: formattazione prezzo, escape HTML, righe editabili inline, bottoni azione, voci menu contestuale |
+| `ricerca.js` | Fetch ricerca, render risultati (`result-list`), click → dettaglio, modifica inline attributi |
 
 ---
 
