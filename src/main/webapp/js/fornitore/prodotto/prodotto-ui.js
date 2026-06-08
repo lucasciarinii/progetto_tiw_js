@@ -125,7 +125,6 @@ window.prodottoUi = (function () {
         escapeHtml,
         creaRigaCampoProdotto,
         creaRigaCampoSku,
-        creaRigaCampoEditabile,
         creaBottoneAzione,
         creaVoceMenu
     };

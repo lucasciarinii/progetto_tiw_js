@@ -37,7 +37,13 @@ window.ricercaPage = (function () {
             inputRicerca.addEventListener('keydown', function (event) {
                 if (event.key === 'Enter') {
                     event.preventDefault();
-                    onClickCerca();
+                    onClickCerca().catch(function (error) {
+                        console.error('[ricerca.js] errore pressione invio:', error);
+                        mostraMessaggioRicerca(
+                            error.message || 'Errore durante la ricerca.',
+                            'error'
+                        );
+                    });
                 }
             });
         }
@@ -49,7 +55,7 @@ window.ricercaPage = (function () {
         // Prima di una nuova ricerca pulisco i messaggi precedenti.
         nascondiMessaggiRicerca();
 
-        const keyword = (inputRicerca?.value || '').trim();
+        const keyword = String(inputRicerca?.value || '').trim();
 
         if (!keyword) {
             mostraMessaggioRicerca('Inserisci una parola chiave per cercare prodotti e SKU.', 'error');
@@ -71,7 +77,7 @@ window.ricercaPage = (function () {
 
             const data = await window.appFornitore.parseJsonResponse(response);
 
-            stato.keywordCorrente = data?.keyword || keyword;
+            stato.keywordCorrente = String(data?.keyword || keyword);
             stato.risultati = normalizzaRisultati(data);
             stato.selezionato = null;
             stato.dettaglioCompleto = null;
@@ -92,11 +98,15 @@ window.ricercaPage = (function () {
         const risultati = [];
 
         // Il backend restituisce prodotti e SKU in due liste separate;
-        // qui le uniformo in una struttura comune.
-        const prodotti = Array.isArray(data?.prodotti) ? data.prodotti : [];
-        const sku = Array.isArray(data?.sku) ? data.sku : [];
+        // qui le porto in un formato unico per la lista risultati.
+        const listaProdotti = Array.isArray(data && data.prodotti) ? data.prodotti : [];
+        const listaSku = Array.isArray(data && data.sku) ? data.sku : [];
 
-        prodotti.forEach(function (prodotto) {
+        listaProdotti.forEach(function (prodotto) {
+            if (!prodotto || prodotto.id == null) {
+                return;
+            }
+
             risultati.push({
                 categoria: 'PRODOTTO',
                 tipo: prodotto.tipo || 'PRODOTTO',
@@ -107,7 +117,11 @@ window.ricercaPage = (function () {
             });
         });
 
-        sku.forEach(function (item) {
+        listaSku.forEach(function (item) {
+            if (!item || item.id == null) {
+                return;
+            }
+
             risultati.push({
                 categoria: 'SKU',
                 tipo: 'SKU',
@@ -143,7 +157,7 @@ window.ricercaPage = (function () {
 
         risultatiContainer.innerHTML = '';
 
-        if (!stato.risultati || stato.risultati.length === 0) {
+        if (!Array.isArray(stato.risultati) || stato.risultati.length === 0) {
             risultatiContainer.innerHTML = `
                 <p class="empty-box">
                     Nessun risultato trovato per <strong>${escapeHtml(stato.keywordCorrente)}</strong>.
@@ -166,14 +180,20 @@ window.ricercaPage = (function () {
 
             if (
                 stato.selezionato &&
-                stato.selezionato.id === item.id &&
+                String(stato.selezionato.id) === String(item.id) &&
                 stato.selezionato.categoria === item.categoria
             ) {
                 button.classList.add('is-active');
             }
 
             button.addEventListener('click', function () {
-                selezionaRisultato(item);
+                selezionaRisultato(item).catch(function (error) {
+                    console.error('[ricerca.js] errore selezione risultato:', error);
+                    mostraMessaggioRicerca(
+                        error.message || 'Errore durante la selezione del risultato.',
+                        'error'
+                    );
+                });
             });
 
             const main = document.createElement('span');
@@ -220,7 +240,7 @@ window.ricercaPage = (function () {
 
             // Per i prodotti recupero il dettaglio completo.
             const dettaglio = await window.prodottoApi.caricaDettaglioProdotto(item.id, item.tipo);
-            stato.dettaglioCompleto = dettaglio || item.raw;
+            stato.dettaglioCompleto = dettaglio || item.raw || item;
             renderDettaglio(stato.dettaglioCompleto);
         } catch (error) {
             console.error('[ricerca.js] errore caricamento dettaglio:', error);
@@ -310,7 +330,7 @@ window.ricercaPage = (function () {
             return;
         }
 
-        stato.risultati = stato.risultati.filter((item) => {
+        stato.risultati = stato.risultati.filter(function (item) {
             return !(String(item.id) === String(id) && item.categoria === categoria);
         });
 
@@ -337,7 +357,7 @@ window.ricercaPage = (function () {
         const prodottoIds = new Set();
         const skuIds = new Set();
 
-        const raccogli = (nodo) => {
+        function raccogli(nodo) {
             if (!nodo || nodo.id == null) {
                 return;
             }
@@ -345,7 +365,7 @@ window.ricercaPage = (function () {
             prodottoIds.add(String(nodo.id));
 
             if (Array.isArray(nodo.skuList)) {
-                nodo.skuList.forEach((sku) => {
+                nodo.skuList.forEach(function (sku) {
                     if (sku && sku.id != null) {
                         skuIds.add(String(sku.id));
                     }
@@ -353,19 +373,22 @@ window.ricercaPage = (function () {
             }
 
             if (Array.isArray(nodo.figli)) {
-                nodo.figli.forEach((figlio) => raccogli(figlio));
+                nodo.figli.forEach(function (figlio) {
+                    raccogli(figlio);
+                });
             }
-        };
+        }
 
         raccogli(prodotto);
 
         // Passaggio extra: intercetto anche eventuali figli presenti in lista
         // ma non inclusi direttamente nel dettaglio completo.
         let aggiunti;
+
         do {
             aggiunti = false;
 
-            stato.risultati.forEach((item) => {
+            stato.risultati.forEach(function (item) {
                 if (item.categoria !== 'PRODOTTO' || item.id == null) {
                     return;
                 }
@@ -383,13 +406,15 @@ window.ricercaPage = (function () {
             });
         } while (aggiunti);
 
-        stato.risultati = stato.risultati.filter((item) => {
+        stato.risultati = stato.risultati.filter(function (item) {
             if (item.categoria === 'PRODOTTO') {
                 return !prodottoIds.has(String(item.id));
             }
+
             if (item.categoria === 'SKU') {
                 return !skuIds.has(String(item.id));
             }
+
             return true;
         });
 
@@ -417,7 +442,7 @@ window.ricercaPage = (function () {
             return;
         }
 
-        stato.risultati = stato.risultati.map((item) => {
+        stato.risultati = stato.risultati.map(function (item) {
             if (String(item.id) !== String(id) || item.categoria !== categoria) {
                 return item;
             }

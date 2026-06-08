@@ -227,8 +227,6 @@ window.prodottoForm = (function () {
 
     return {
         bindEvents,
-        onSubmitProdottoSemplice,
-        onSubmitProdottoComposto,
         aggiornaListaSku,
         renderProdottiDisponibili
     };

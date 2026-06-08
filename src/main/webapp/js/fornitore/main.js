@@ -37,18 +37,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // API condivisa esposta ai moduli figli del fornitore.
     window.appFornitore = {
-        getUtente() {
-            return statoPagina.utente;
-        },
-
-        getSezioneCorrente() {
-            return statoPagina.sezioneCorrente;
-        },
-
-        mostraSezione,
         mostraMessaggioHome,
         mostraMessaggioRicerca,
-        mostraMessaggioCorrente,
         nascondiMessaggi,
 
         async parseJsonResponse(response) {

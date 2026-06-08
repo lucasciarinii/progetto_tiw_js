@@ -5,13 +5,11 @@ window.prodottoApi = (function () {
     }
 
     async function postFormUrlEncoded(url, params) {
-        // Utility comune per le POST con body form-url-encoded.
         const body = new URLSearchParams();
 
-        // Inserisco solo i parametri davvero valorizzati.
         Object.entries(params).forEach(([chiave, valore]) => {
             if (valore != null) {
-                body.append(chiave, valore);
+                body.append(chiave, String(valore));
             }
         });
 
@@ -25,7 +23,6 @@ window.prodottoApi = (function () {
             body: body.toString()
         });
 
-        // Parsing ed error handling restano centralizzati nel modulo principale.
         return window.appFornitore.parseJsonResponse(response);
     }
 
@@ -117,7 +114,6 @@ window.prodottoApi = (function () {
     }
 
     return {
-        postFormUrlEncoded,
         caricaSkuDisponibili,
         caricaProdottiDisponibili,
         caricaDettaglioProdotto,

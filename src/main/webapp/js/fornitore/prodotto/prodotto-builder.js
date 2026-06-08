@@ -849,23 +849,7 @@ window.prodottoBuilder = (function () {
 
     return {
         renderBuilder,
-        renderBuilderNode,
         nextBuilderNodeId,
-        nextBuilderSkuId,
-        trovaNodoBuilder,
-        removeNodeByClientId,
-        registraEliminazioneProdotto,
-        rimuoviNodoDalBuilder,
-        eliminaNodoDalBuilder,
-        rimuoviSkuDalBuilder,
-        eliminaSkuDalBuilder,
-        validaBuilder,
-        serializzaNodoBuilder,
         mappaProdottoEsistentePerBuilder,
-        aggiungiFiglioSemplice,
-        aggiungiFiglioComposto,
-        aggiungiSkuEsistente,
-        aggiungiSkuNuova,
-        onSalvaBuilder
     };
 })();

@@ -507,10 +507,8 @@ window.prodottoDettaglio = (function () {
     }
 
     return {
-        estraiProdottoAggiornato,
-        rerenderDaRisposta,
         mostraDettaglioProdottoCreato,
         renderDettaglioProdottoInContainer,
-        refreshContenitoreDaPadre
+
     };
 })();

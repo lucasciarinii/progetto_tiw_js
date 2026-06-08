@@ -43,12 +43,6 @@ window.prodottoPage = (function () {
         // Espone lo stato condiviso agli altri moduli del blocco prodotto.
         return state;
     }
-
-    function mostraMessaggioGlobale(testo, tipo) {
-        // Piccolo wrapper per i messaggi della home fornitore.
-        window.appFornitore.mostraMessaggioHome(testo, tipo);
-    }
-
     async function init() {
         // Recupero dei riferimenti DOM principali della sezione home.
         state.formProdottoSemplice = document.getElementById('form-crea-semplice');
@@ -72,9 +66,7 @@ window.prodottoPage = (function () {
     return {
         init,
         getState,
-        mostraMessaggioGlobale,
-
-        // Shortcut utile per forzare il refresh della lista SKU.
+// Shortcut utile per forzare il refresh della lista SKU.
         caricaSkuDisponibili: () => window.prodottoApi.caricaSkuDisponibili(),
 
         // Shortcut verso il modulo dettaglio prodotto.
