@@ -19,9 +19,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-@WebServlet("/apifornitoreprodottocrea")
+@WebServlet("/api/fornitore/prodotto/crea")
 @MultipartConfig
-public class CreaProdottoServlet extends BaseApiServlet {
+public class CreaProdotto extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

@@ -11,8 +11,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.sql.SQLException;
 
-@WebServlet("/apifornitoreprodottoaggiorna")
-public class AggiornaProdottoServlet extends BaseApiServlet {
+@WebServlet("/api/fornitore/prodotto/aggiorna")
+public class AggiornaProdotto extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

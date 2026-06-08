@@ -33,7 +33,7 @@ window.prodottoApi = (function () {
         // Carica tutte le SKU disponibili e aggiorna il form del prodotto semplice.
         const state = getState();
 
-        const response = await fetch('apifornitoresku', {
+        const response = await fetch('api/fornitore/sku', {
             method: 'GET',
             credentials: 'same-origin',
             headers: { Accept: 'application/json' }
@@ -50,7 +50,7 @@ window.prodottoApi = (function () {
         // come figli iniziali di un composto.
         const state = getState();
 
-        const response = await fetch('apifornitoreprodotti-disponibili', {
+        const response = await fetch('api/fornitore/prodotti-disponibili', {
             method: 'GET',
             credentials: 'same-origin',
             headers: { Accept: 'application/json' }
@@ -68,7 +68,7 @@ window.prodottoApi = (function () {
     async function caricaDettaglioProdotto(idProdotto, tipoProdotto) {
         // Carica il dettaglio completo di un prodotto.
         const response = await fetch(
-            `apifornitoreprodotto-dettaglio?id=${encodeURIComponent(idProdotto)}&tipo=${encodeURIComponent(String(tipoProdotto || '').trim().toUpperCase())}`,
+            `api/fornitore/prodotto-dettaglio?id=${encodeURIComponent(idProdotto)}&tipo=${encodeURIComponent(String(tipoProdotto || '').trim().toUpperCase())}`,
             {
                 method: 'GET',
                 credentials: 'same-origin',
@@ -81,17 +81,17 @@ window.prodottoApi = (function () {
 
     async function aggiornaCampoProdotto(id, campo, valore) {
         // Aggiornamento inline di un singolo attributo prodotto.
-        return postFormUrlEncoded('apifornitoreprodottoaggiorna', { id, campo, valore });
+        return postFormUrlEncoded('api/fornitore/prodotto/aggiorna', { id, campo, valore });
     }
 
     async function aggiornaCampoSku(id, campo, valore) {
         // Aggiornamento inline di un singolo attributo SKU.
-        return postFormUrlEncoded('apifornitoreskuaggiorna', { id, campo, valore });
+        return postFormUrlEncoded('api/fornitore/sku/aggiorna', { id, campo, valore });
     }
 
     async function rimuoviAssociazioneProdottoSku(prodottoId, skuId) {
         // Rimuove l'associazione tra prodotto semplice e SKU.
-        return postFormUrlEncoded('apifornitoreassociazionerimuovi', {
+        return postFormUrlEncoded('api/fornitore/associazione/rimuovi', {
             tipoRelazione: 'PRODOTTO_SKU',
             prodottoId,
             skuId
@@ -100,7 +100,7 @@ window.prodottoApi = (function () {
 
     async function rimuoviAssociazionePadreFiglio(figlioId, padreId) {
         // Rimuove la relazione gerarchica tra padre e figlio.
-        return postFormUrlEncoded('apifornitoreassociazionerimuovi', {
+        return postFormUrlEncoded('api/fornitore/associazione/rimuovi', {
             tipoRelazione: 'PADRE_FIGLIO',
             figlioId,
             padreId
@@ -109,7 +109,7 @@ window.prodottoApi = (function () {
 
     async function eliminaOggetto(id, tipo, returnProdottoId = null) {
         // Elimina una SKU o un prodotto.
-        return postFormUrlEncoded('apifornitoreoggettoelimina', {
+        return postFormUrlEncoded('api/fornitore/oggetto/elimina', {
             id,
             tipo,
             returnProdottoId

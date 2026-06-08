@@ -15,8 +15,8 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
-@WebServlet("/apifornitoreoggettoelimina")
-public class EliminaOggettoServlet extends BaseApiServlet {
+@WebServlet("/api/fornitore/oggetto/elimina")
+public class EliminaOggetto extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

@@ -18,8 +18,8 @@ import java.sql.SQLException;
  * - per un prodotto semplice serve anche la lista delle SKU associate;
  * - per un prodotto composto serve il sottoalbero dei sottoprodotti.
  */
-@WebServlet("/apifornitoreprodotto-dettaglio")
-public class GetDettaglioProdottoServlet extends BaseApiServlet {
+@WebServlet("/api/fornitore/prodotto-dettaglio")
+public class GetDettaglioProdotto extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

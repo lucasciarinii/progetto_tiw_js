@@ -11,8 +11,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.sql.SQLException;
 
-@WebServlet("/apifornitoreassociazionerimuovi")
-public class RimuoviAssociazioneServlet extends BaseApiServlet {
+@WebServlet("/api/fornitore/associazione/rimuovi")
+public class RimuoviAssociazione extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

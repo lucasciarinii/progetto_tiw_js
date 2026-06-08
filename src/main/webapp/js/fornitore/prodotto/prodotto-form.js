@@ -46,7 +46,7 @@ window.prodottoForm = (function () {
 
         try {
             // Il prodotto semplice viene creato subito lato server.
-            const response = await fetch('apifornitoreprodottocrea', {
+            const response = await fetch('api/fornitore/prodotto/crea', {
                 method: 'POST',
                 credentials: 'same-origin',
                 body: formData

@@ -809,7 +809,7 @@ window.prodottoBuilder = (function () {
 
         try {
             // Unica chiamata che persiste tutta la struttura costruita lato client.
-            const response = await fetch('apifornitoreprodottocrea', {
+            const response = await fetch('api/fornitore/prodotto/crea', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {

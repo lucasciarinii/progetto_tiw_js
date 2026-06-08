@@ -20,9 +20,9 @@ import java.sql.SQLException;
  * Aggiorna un singolo campo di una SKU tramite inline editing
  * e restituisce il dettaglio aggiornato in JSON.
  */
-@WebServlet("/apifornitoreskuaggiorna")
+@WebServlet("/api/fornitore/sku/aggiorna")
 @MultipartConfig
-public class AggiornaSKUServlet extends BaseApiServlet {
+public class AggiornaSKU extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

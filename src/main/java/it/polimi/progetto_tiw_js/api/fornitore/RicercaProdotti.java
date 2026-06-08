@@ -27,8 +27,8 @@ import java.util.Map;
  *   "sku": [...]
  * }
  */
-@WebServlet("/apifornitorericerca")
-public class RicercaProdottiServlet extends BaseApiServlet {
+@WebServlet("/api/fornitore/ricerca")
+public class RicercaProdotti extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

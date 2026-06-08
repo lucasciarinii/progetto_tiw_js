@@ -66,7 +66,7 @@ window.skuPage = (function () {
         }
 
         try {
-            const response = await fetch('apifornitoreskucrea', {
+            const response = await fetch('api/fornitore/sku/crea', {
                 method: 'POST',
                 credentials: 'same-origin',
                 body: formData
@@ -639,7 +639,7 @@ window.skuPage = (function () {
         body.append('campo', campo);
         body.append('valore', valore);
 
-        const response = await fetch('apifornitoreskuaggiorna', {
+        const response = await fetch('api/fornitore/sku/aggiorna', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -663,7 +663,7 @@ window.skuPage = (function () {
         formData.append('campo', 'fotografia');
         formData.append('fotografia', file);
 
-        const response = await fetch('apifornitoreskuaggiorna', {
+        const response = await fetch('api/fornitore/sku/aggiorna', {
             method: 'POST',
             credentials: 'same-origin',
             body: formData
@@ -678,7 +678,7 @@ window.skuPage = (function () {
         body.append('id', skuId);
         body.append('tipo', 'SKU');
 
-        const response = await fetch('apifornitoreoggettoelimina', {
+        const response = await fetch('api/fornitore/oggetto/elimina', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {

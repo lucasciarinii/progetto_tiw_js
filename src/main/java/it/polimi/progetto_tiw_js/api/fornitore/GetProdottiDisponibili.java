@@ -19,8 +19,8 @@ import java.util.List;
  * Al frontend basta ricevere i dati essenziali del prodotto,
  * come id, nome, codice e tipo.
  */
-@WebServlet("/apifornitoreprodotti-disponibili")
-public class GetProdottiDisponibiliServlet extends BaseApiServlet {
+@WebServlet("/api/fornitore/prodotti-disponibili")
+public class GetProdottiDisponibili extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

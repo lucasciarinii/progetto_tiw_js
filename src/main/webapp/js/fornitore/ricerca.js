@@ -61,7 +61,7 @@ window.ricercaPage = (function () {
 
     async function eseguiRicerca(keyword) {
         try {
-            const response = await fetch(`apifornitorericerca?keyword=${encodeURIComponent(keyword)}`, {
+            const response = await fetch(`api/fornitore/ricerca?keyword=${encodeURIComponent(keyword)}`, {
                 method: 'GET',
                 credentials: 'same-origin',
                 headers: {

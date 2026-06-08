@@ -18,8 +18,8 @@ import java.util.List;
  * Questa lista viene usata dal frontend del fornitore
  * per popolare viste, selezioni e dettagli delle SKU.
  */
-@WebServlet("/apifornitoresku")
-public class GetSKUListServlet extends BaseApiServlet {
+@WebServlet("/api/fornitore/sku")
+public class GetSKUList extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 

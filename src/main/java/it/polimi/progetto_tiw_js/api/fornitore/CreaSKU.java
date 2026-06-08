@@ -24,9 +24,9 @@ import java.sql.SQLException;
  * anche il file della fotografia. Per questo motivo, anche i campi testuali
  * vengono letti tramite Part invece che con getParameter().
  */
-@WebServlet("/apifornitoreskucrea")
+@WebServlet("/api/fornitore/sku/crea")
 @MultipartConfig
-public class CreaSKUServlet extends BaseApiServlet {
+public class CreaSKU extends BaseApiServlet {
 
     private static final long serialVersionUID = 1L;
 
