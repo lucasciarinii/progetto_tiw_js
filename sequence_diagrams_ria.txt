@@ -87,7 +87,7 @@ participant "Browser\n(homecliente.js)" as JS
 participant "GetProdotti\n(Servlet)" as Servlet
 participant "ProdottoDAO" as DAO
 
-Utente->JS: click su "Precedenti" / "Successivi"
+Utente->JS: click su "Precedente" / "Successiva"
 JS->JS: calcola la nuova pagina
 
 JS->Servlet: GET /api/cliente/prodotti?pagina=N
@@ -113,7 +113,7 @@ DAO-->Servlet: lista sottoprodotti
 Servlet-->JS: ok { sottoprodotti }
 
 JS->JS: costruisce l'albero nidificato del prodotto
-JS->JS: renderizza i nodi semplici con selezione SKU\ned i nodi composti espandibiliS
+JS->JS: renderizza i nodi semplici con selezione SKU\ned i nodi composti espandibili
 
 Salva configurazione ---------------------------------------------------------------------------------------------
 actor Utente
