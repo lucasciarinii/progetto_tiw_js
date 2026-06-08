@@ -52,6 +52,9 @@ JS->JS: window.location.href = "index.html"
 
 
 
+
+
+
 CLIENTE =======================================================================
 =======================================================================
 =======================================================================
@@ -212,3 +215,39 @@ end
 FORNITORE =======================================================================
 =======================================================================
 =======================================================================
+
+Accesso HomeFornitore:-----------------------------------------------------------
+@startuml
+actor Fornitore
+participant "main.js" as Main
+participant "fornitore.html" as Home
+participant "sku.js" as Sku
+participant "prodotto.js" as Prodotto
+participant "GetSKUListServlet" as GetSKUList
+participant "GetProdottiDisponibiliServlet" as GetProdottiDisponibili
+
+Fornitore -> Main: accede alla home fornitore
+Main -> Home: mostra sezione-home
+
+Main -> Sku: init()
+Sku -> Home: recupera form crea SKU e pannello dettaglio
+Sku -> Home: collega submit form crea SKU
+Sku -> Home: mostra dettaglio vuoto
+
+Main -> Prodotto: init()
+Prodotto -> Home: recupera form prodotto e liste
+Prodotto -> Home: collega submit form prodotto semplice e composto
+
+par
+    Prodotto -> GetSKUList: richiede elenco SKU
+    GetSKUList --> Prodotto: lista SKU
+    Prodotto -> Home: popola lista SKU nel form prodotto semplice
+else
+    Prodotto -> GetProdottiDisponibili: richiede prodotti disponibili
+    GetProdottiDisponibili --> Prodotto: lista prodotti disponibili
+    Prodotto -> Home: popola lista prodotti nel form prodotto composto
+end
+@enduml
+
+
+Accesso HomeFornitore:-----------------------------------------------------------
