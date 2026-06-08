@@ -223,6 +223,8 @@ participant "main.js" as Main
 participant "fornitore.html" as Home
 participant "sku.js" as Sku
 participant "prodotto.js" as Prodotto
+participant "prodotto-form.js" as ProdottoForm
+participant "prodotto-api.js" as ProdottoApi
 participant "GetSKUListServlet" as GetSKUList
 participant "GetProdottiDisponibiliServlet" as GetProdottiDisponibili
 
@@ -235,19 +237,133 @@ Sku -> Home: collega submit form crea SKU
 Sku -> Home: mostra dettaglio vuoto
 
 Main -> Prodotto: init()
-Prodotto -> Home: recupera form prodotto e liste
-Prodotto -> Home: collega submit form prodotto semplice e composto
+Prodotto -> Home: recupera form e liste prodotti
+Prodotto -> ProdottoForm: bindEvents()
 
 par
-    Prodotto -> GetSKUList: richiede elenco SKU
-    GetSKUList --> Prodotto: lista SKU
-    Prodotto -> Home: popola lista SKU nel form prodotto semplice
+Prodotto -> ProdottoApi: carica SKU disponibili
+ProdottoApi -> GetSKUList: richiede elenco SKU
+GetSKUList --> ProdottoApi: ok
+ProdottoApi -> ProdottoForm: aggiorna form prodotto semplice
 else
-    Prodotto -> GetProdottiDisponibili: richiede prodotti disponibili
-    GetProdottiDisponibili --> Prodotto: lista prodotti disponibili
-    Prodotto -> Home: popola lista prodotti nel form prodotto composto
+Prodotto -> ProdottoApi: carica prodotti disponibili
+ProdottoApi -> GetProdottiDisponibili: richiede prodotti disponibili
+GetProdottiDisponibili --> ProdottoApi: ok
+ProdottoApi -> ProdottoForm: aggiorna form prodotto composto
 end
 @enduml
 
+Click tasto  Salva SKU:-----------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "sku.js" as Sku
+participant "main.js " as Main
+participant "CreaSKU" as CreaSKU
+participant "SKUDAO" as SKUDAO
+participant "prodotto.js" as Prodotto
 
-Accesso HomeFornitore:-----------------------------------------------------------
+Fornitore -> Home: click su "Salva SKU"
+Home -> Sku: submit form-crea-sku
+Sku -> Sku: onSubmitCreaSku(event)
+Sku -> Main: nascondiMessaggi()
+Sku -> Sku: validaFormSku(formData)
+
+alt validazione client fallita
+    Sku -> Main: mostraMessaggioHome(errore, "error")
+else validazione client ok
+    Sku -> CreaSKU: POST api/fornitore/sku/crea (FormData)
+    CreaSKU -> CreaSKU: legge e valida i dati ricevuti
+
+    alt errore nella creazione della SKU
+        CreaSKU --> Sku: errore HTTP + JSON
+        Sku -> Main: parseJsonResponse(response)
+        Main --> Sku: eccezione
+        Sku -> Main: mostraMessaggioHome(errore, "error")
+    else SKU creata con successo
+        CreaSKU -> SKUDAO: createSKU(...)
+        SKUDAO --> CreaSKU: idGenerato
+        CreaSKU -> SKUDAO: findById(idGenerato)
+        SKUDAO --> CreaSKU: skuCreata
+        CreaSKU --> Sku: 200 + JSON skuCreata
+
+        Sku -> Main: parseJsonResponse(response)
+        Main --> Sku: data
+        Sku -> Home: reset form crea SKU
+        Sku -> Main: mostraMessaggioHome("SKU creata con successo.", "success")
+        Sku -> Prodotto: caricaSkuDisponibili()
+        Prodotto --> Sku: ok
+        Sku -> Home: aggiorna dettaglio-content con dettaglio SKU creata
+    end
+end
+@enduml
+
+Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "prodotto-form.js" as ProdottoForm
+participant "main.js " as Main
+participant "CreaProdotto" as CreaProdotto
+participant "ProdottoDAO" as ProdottoDAO
+participant "prodotto-dettaglio.js" as ProdottoDettaglio
+participant "prodotto-api.js" as ProdottoApi
+
+Fornitore -> Home: click su "Salva prodotto semplice"
+Home -> ProdottoForm: submit form-crea-semplice
+ProdottoForm -> ProdottoForm: onSubmitProdottoSemplice(event)
+ProdottoForm -> ProdottoForm: legge e valida i dati del form
+
+alt validazione client fallita
+    ProdottoForm -> Main: mostraMessaggioHome(errore, "error")
+else validazione client ok
+    ProdottoForm -> CreaProdotto: POST api/fornitore/prodotto/crea (FormData)
+    CreaProdotto -> CreaProdotto: legge e valida i dati ricevuti
+    CreaProdotto -> CreaProdotto: instrada il flusso su creaProdottoSemplice(...)
+
+    alt errore nella creazione del prodotto semplice
+        CreaProdotto --> ProdottoForm: errore HTTP + JSON
+        ProdottoForm -> Main: parseJsonResponse(response)
+        Main --> ProdottoForm: eccezione
+        ProdottoForm -> Main: mostraMessaggioHome(errore, "error")
+    else prodotto semplice creato con successo
+        CreaProdotto -> ProdottoDAO: createProdottoSemplice(codice, nome)
+        ProdottoDAO --> CreaProdotto: prodottoId
+
+        loop per ogni SKU selezionata
+            CreaProdotto -> ProdottoDAO: addSKUToProdotto(prodottoId, skuId)
+            ProdottoDAO --> CreaProdotto: ok
+        end
+
+        CreaProdotto -> ProdottoDAO: findByIdConSKU(prodottoId)
+        ProdottoDAO --> CreaProdotto: prodottoCreato
+        CreaProdotto --> ProdottoForm: 200 + JSON prodottoCreato
+
+        ProdottoForm -> Main: parseJsonResponse(response)
+        Main --> ProdottoForm: data
+        ProdottoForm -> Home: reset form crea prodotto semplice
+        ProdottoForm -> Main: mostraMessaggioHome("Prodotto semplice creato con successo.", "success")
+        ProdottoForm -> ProdottoDettaglio: mostraDettaglioProdottoCreato(data)
+        ProdottoDettaglio -> Home: renderDettaglioProdottoInContainer(...)
+
+        par
+            ProdottoForm -> ProdottoApi: caricaProdottiDisponibili()
+            ProdottoApi --> ProdottoForm: ok
+        else
+            ProdottoForm -> ProdottoApi: caricaSkuDisponibili()
+            ProdottoApi --> ProdottoForm: ok
+        end
+    end
+end
+@enduml
+
+Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+
+
+
+Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+
+
+
+Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+
