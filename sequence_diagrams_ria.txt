@@ -357,13 +357,148 @@ else validazione client ok
 end
 @enduml
 
+Click tasto Salva Prodotto Composto (Crea bozza):-----------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "prodotto-form.js" as ProdottoForm
+participant "main.js" as Main
+participant "prodotto-api.js" as ProdottoApi
+participant "GetDettaglioProdotto" as GetDettaglioProdotto
+participant "prodotto-builder.js" as ProdottoBuilder
+
+Fornitore -> Home: click su "Salva prodotto composto"
+Home -> ProdottoForm: submit form-crea-composto
+ProdottoForm -> ProdottoForm: onSubmitProdottoComposto(event)
+ProdottoForm -> ProdottoForm: legge e valida i dati del form
+
+alt validazione client fallita
+    ProdottoForm -> Main: mostraMessaggioHome(errore, "error")
+else validazione client ok
+    ProdottoForm -> ProdottoForm: filtra dalla cache i figli top-level selezionati
+
+   par per ogni figlio selezionato
+    ProdottoForm -> ProdottoApi: caricaDettaglioProdotto(id, tipo)
+    ProdottoApi -> GetDettaglioProdotto: GET /api/fornitore/prodotto-dettaglio?id&tipo
+    GetDettaglioProdotto --> ProdottoApi: ok
+    ProdottoApi --> ProdottoForm: dettaglio completo
+end
+
+    alt errore durante il caricamento dei prodotti selezionati
+        ProdottoForm -> Main: mostraMessaggioHome(errore, "error")
+    else figli caricati correttamente
+        ProdottoForm -> ProdottoBuilder: nextBuilderNodeId()
+        ProdottoForm -> ProdottoBuilder: mappaProdottoEsistentePerBuilder(figliCompleti)
+        ProdottoForm -> ProdottoForm: crea state.builderState
+
+        ProdottoForm -> ProdottoBuilder: renderBuilder()
+        ProdottoBuilder -> Home: aggiorna dettaglio-content con il builder
+        ProdottoForm -> Main: mostraMessaggioHome("Bozza del prodotto composto creata con successo.", "success")
+    end
+end
+@enduml
+
+
+Click tasto Salva Prodotto Composto (Salvataggio da bozza):-----------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "prodotto-builder.js" as ProdottoBuilder
+participant "main.js" as Main
+participant "CreaProdotto" as CreaProdotto
+participant "ProdottoDAO" as ProdottoDAO
+participant "SKUDAO" as SKUDAO
+participant "prodotto-dettaglio.js" as ProdottoDettaglio
+participant "prodotto-api.js" as ProdottoApi
+
+Fornitore -> Home: click su "SALVA PRODOTTO"
+Home -> ProdottoBuilder: onSalvaBuilder()
+
+alt nessuna bozza presente
+    ProdottoBuilder -> Main: mostraMessaggioHome(errore, "error")
+else bozza presente
+    ProdottoBuilder -> ProdottoBuilder: validaBuilder(state.builderState, 1)
+
+    alt validazione client fallita
+        ProdottoBuilder -> Main: mostraMessaggioHome(errore, "error")
+    else validazione client ok
+        ProdottoBuilder -> ProdottoBuilder: serializzaNodoBuilder(state.builderState)
+        ProdottoBuilder -> ProdottoBuilder: aggiunge eliminaProdotti e eliminaSku
+        ProdottoBuilder -> CreaProdotto: POST api/fornitore/prodotto/crea (application/json)
+
+        CreaProdotto -> CreaProdotto: doPost()
+        CreaProdotto -> CreaProdotto: riconosce il flusso JSON del builder
+        CreaProdotto -> CreaProdotto: gestisciCreazioneCompostoDaJson()
+        CreaProdotto -> CreaProdotto: deserializza il payload JSON
+        CreaProdotto -> CreaProdotto: validaNodoBuilder(root, 1)
+        CreaProdotto -> ProdottoDAO: existsByCodice(root.codice)
+        ProdottoDAO --> CreaProdotto: esito
+        CreaProdotto -> CreaProdotto: validaEliminazioni(...)
+
+        alt errore di validazione server
+            CreaProdotto --> ProdottoBuilder: errore HTTP + JSON
+            ProdottoBuilder -> Main: parseJsonResponse(response)
+            Main --> ProdottoBuilder: eccezione
+            ProdottoBuilder -> Main: mostraMessaggioHome(errore, "error")
+        else payload valido
+            CreaProdotto -> CreaProdotto: apre transazione
+
+            opt ci sono eliminazioni richieste
+                CreaProdotto -> CreaProdotto: applicaEliminazioni(...)
+                CreaProdotto -> ProdottoDAO: elimina prodotti richiesti
+                CreaProdotto -> SKUDAO: elimina SKU richieste
+            end
+
+            CreaProdotto -> CreaProdotto: persistiNodoBuilder(root, null, prodottoDAO)
+
+            group persistenza ricorsiva dell'albero
+                CreaProdotto -> ProdottoDAO: crea/aggiorna composto radice
+                CreaProdotto -> ProdottoDAO: collega eventuali figli al padre
+                CreaProdotto -> ProdottoDAO: crea/aggiorna nodi semplici e composti
+                CreaProdotto -> SKUDAO: crea eventuali nuove SKU
+                CreaProdotto -> ProdottoDAO: aggiunge/rimuove associazioni prodotto-SKU
+                CreaProdotto -> ProdottoDAO: scollega eventuali figli non più presenti
+            end
+
+            CreaProdotto -> CreaProdotto: commit transazione
+            CreaProdotto -> ProdottoDAO: findByIdConDiscendenti(rootId)
+            ProdottoDAO --> CreaProdotto: prodottoCreato completo
+            CreaProdotto --> ProdottoBuilder: 200 + JSON prodottoCreato
+
+            ProdottoBuilder -> Main: parseJsonResponse(response)
+            Main --> ProdottoBuilder: data
+            ProdottoBuilder -> ProdottoBuilder: builderState = null
+            ProdottoBuilder -> Home: reset form-crea-composto
+            ProdottoBuilder -> Main: mostraMessaggioHome("Prodotto composto salvato con successo.", "success")
+
+            alt risposta con prodotto creato
+                ProdottoBuilder -> ProdottoDettaglio: mostraDettaglioProdottoCreato(data)
+                ProdottoDettaglio -> Home: aggiorna dettaglio-content
+            else nessun dato restituito
+                ProdottoBuilder -> Home: mostra messaggio di salvataggio nel side-panel
+            end
+
+            par
+                ProdottoBuilder -> ProdottoApi: caricaProdottiDisponibili()
+                ProdottoApi --> ProdottoBuilder: ok
+            else
+                ProdottoBuilder -> ProdottoApi: caricaSkuDisponibili()
+                ProdottoApi --> ProdottoBuilder: ok
+            end
+        end
+    end
+end
+@enduml
+
 Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
 
 
+Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+
 
 Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
 
 
-
 Click tasto Salva Prodotto Semplice:-----------------------------------------------------------
+
 
