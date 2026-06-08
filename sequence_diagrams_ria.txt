@@ -52,12 +52,162 @@ JS->JS: window.location.href = "index.html"
 
 
 
-
-
-
 CLIENTE =======================================================================
 =======================================================================
 =======================================================================
+
+Accesso pagina home cliente ---------------------------------------------------------------------------------------------
+actor Utente
+participant "Browser\n(main.js + homecliente.js)" as JS
+participant "GetProdotti\n(Servlet)" as Servlet
+participant "ProdottoDAO" as DAO
+
+Utente->JS: apre la home cliente\noppure clicca su "Home"
+JS->JS: mostra sezione-home
+JS->JS: homeClientePage.onMostra()
+
+JS->Servlet: GET /api/cliente/prodotti?pagina=N
+Servlet->DAO: countTopLevelComposti()\nfindTopLevelComposti(offset, 10)
+DAO-->Servlet: totale prodotti + lista prodotti
+Servlet-->JS: ok { prodotti, paginaCorrente, totalePagine }
+
+JS->JS: renderizza lista prodotti
+JS->JS: renderizza paginazione
+
+alt nessun prodotto disponibile
+  JS->JS: mostra messaggio di lista vuota
+end
+
+Click su precedente/successiva pagina ---------------------------------------------------------------------------------------------
+actor Utente
+participant "Browser\n(homecliente.js)" as JS
+participant "GetProdotti\n(Servlet)" as Servlet
+participant "ProdottoDAO" as DAO
+
+Utente->JS: click su "Precedenti" / "Successivi"
+JS->JS: calcola la nuova pagina
+
+JS->Servlet: GET /api/cliente/prodotti?pagina=N
+Servlet->DAO: countTopLevelComposti()\nfindTopLevelComposti(offset, 10)
+DAO-->Servlet: prodotti e totale pagine
+Servlet-->JS: ok { prodotti, paginaCorrente, totalePagine }
+
+JS->JS: aggiorna lista prodotti e paginazione
+
+
+Click su prodotto di primo livello ---------------------------------------------------------------------------------------------
+actor Utente
+participant "Browser\n(homecliente.js + sceltaSku.js)" as JS
+participant "GetSottoprodotti\n(Servlet)" as Servlet
+participant "ProdottoDAO" as DAO
+
+Utente->JS: click su un prodotto di primo livello
+JS->JS: apre sezione-scelta-sku\nimposta prodotto selezionato e nome configurazione vuoto
+
+JS->Servlet: GET /api/cliente/sottoprodotti?id=X
+Servlet->DAO: recupera i figli diretti del prodotto
+DAO-->Servlet: lista sottoprodotti
+Servlet-->JS: ok { sottoprodotti }
+
+JS->JS: costruisce l'albero nidificato del prodotto
+JS->JS: renderizza i nodi semplici con selezione SKU\ned i nodi composti espandibiliS
+
+Salva configurazione ---------------------------------------------------------------------------------------------
+actor Utente
+participant "Browser\n(sceltaSku.js)" as JS
+participant "SalvaConfigurazione\n(Servlet)" as Servlet
+participant "ProdottoDAO" as ProdottoDAO
+participant "ConfigurazioneDAO" as ConfDAO
+
+Utente->JS: compila nome configurazione\ne seleziona le SKU
+Utente->JS: click su "Salva configurazione"
+
+JS->Servlet: POST /api/cliente/configurazione/salva\n[nomeConf, prodottoId, sku_<id>...]
+
+alt dati mancanti o non validi
+  Servlet-->JS: errore
+  JS->JS: mostra messaggio di errore\nresta in sezione-scelta-sku
+else dati validi
+  Servlet->ProdottoDAO: findByIdConDiscendenti(prodottoId)
+  ProdottoDAO-->Servlet: prodotto con discendenti
+  Servlet->Servlet: raccoglie i prodotti semplici\ne valida le SKU selezionate
+
+  alt configurazione nuova
+    Servlet->ConfDAO: createConfigurazione(nomeConf, clienteId,\nprodottoId, skuScelte)
+    ConfDAO-->Servlet: id configurazione
+  else modifica configurazione esistente
+    Servlet->ConfDAO: findById(configurazioneId)\nupdateConfigurazione(...)
+    ConfDAO-->Servlet: ok
+  end
+
+  Servlet-->JS: ok { id }
+  JS->JS: apre sezione-dettaglio\ncarica il dettaglio della configurazione salvata
+end
+
+Click su "Le mie configurazioni" ---------------------------------------------------------------------------------------------
+actor Utente
+participant "Browser\n(main.js + configurazioni.js)" as JS
+participant "GetConfigurazioni\n(Servlet)" as Servlet
+participant "ConfigurazioneDAO" as DAO
+
+Utente->JS: click su "Le mie configurazioni"
+JS->JS: apre sezione-mie-configurazioni
+
+JS->Servlet: GET /api/cliente/configurazioni
+Servlet->DAO: recupera le configurazioni del cliente
+DAO-->Servlet: lista configurazioni
+Servlet-->JS: ok { configurazioni }
+
+JS->JS: renderizza la tabella delle configurazioni
+
+alt nessuna configurazione presente
+  JS->JS: mostra stato vuoto
+end
+
+Le mie configurazioni > Modifica ---------------------------------------------------------------------------------------------
+actor Utente
+participant "Browser\n(configurazioni.js + sceltaSku.js)" as JS
+participant "GetDettaglioConfigurazione\n(Servlet)" as Servlet
+participant "ConfigurazioneDAO" as DAO
+
+Utente->JS: click su "Modifica"
+JS->JS: apre sezione-scelta-sku\naggiorna lo stato di sceltaSku.js
+
+JS->Servlet: GET /api/cliente/configurazione?id=X
+Servlet->DAO: recupera il dettaglio della configurazione
+DAO-->Servlet: configurazione con SKU scelte
+Servlet-->JS: ok { configurazione }
+
+JS->JS: precompila nome configurazione e SKU selezionate
+JS->JS: renderizza l'albero pronto per la modifica
+
+Le mie configurazioni > Clona ---------------------------------------------------------------------------------------------
+actor Utente
+participant "Browser\n(configurazioni.js)" as JS
+participant "ClonaConfigurazione\n(Servlet)" as Servlet
+participant "ConfigurazioneDAO" as DAO
+
+Utente->JS: click su "Clona"
+JS->JS: chiede conferma
+
+alt utente annulla
+  JS->JS: nessuna operazione
+else utente conferma
+  JS->Servlet: POST /api/cliente/configurazione/clona\n[configurazioneId]
+
+  Servlet->DAO: cloneConfigurazione(configurazioneId, clienteId)
+  DAO-->Servlet: nuova configurazione clonata
+  Servlet-->JS: ok
+
+  JS->JS: mostra messaggio di successo
+  JS->Servlet: GET /api/cliente/configurazioni
+  Servlet->DAO: recupera le configurazioni aggiornate
+  DAO-->Servlet: lista configurazioni
+  Servlet-->JS: ok { configurazioni }
+
+  JS->JS: aggiorna il pannello delle configurazioni
+end
+
 
 FORNITORE =======================================================================
 =======================================================================
