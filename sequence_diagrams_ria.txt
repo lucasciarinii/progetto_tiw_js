@@ -411,31 +411,25 @@ participant "SKUDAO" as SKUDAO
 participant "prodotto-dettaglio.js" as ProdottoDettaglio
 participant "prodotto-api.js" as ProdottoApi
 
-Fornitore -> Home: click su "SALVA PRODOTTO"
+Fornitore -> Home: click "SALVA PRODOTTO"
 Home -> ProdottoBuilder: onSalvaBuilder()
 
-alt nessuna bozza presente
+alt bozza assente
     ProdottoBuilder -> Main: mostraMessaggioHome(errore, "error")
 else bozza presente
-    ProdottoBuilder -> ProdottoBuilder: validaBuilder(state.builderState, 1)
+    ProdottoBuilder -> ProdottoBuilder: validaBuilder(...) + serializzaNodoBuilder(...)
 
     alt validazione client fallita
         ProdottoBuilder -> Main: mostraMessaggioHome(errore, "error")
     else validazione client ok
-        ProdottoBuilder -> ProdottoBuilder: serializzaNodoBuilder(state.builderState)
-        ProdottoBuilder -> ProdottoBuilder: aggiunge eliminaProdotti e eliminaSku
-        ProdottoBuilder -> CreaProdotto: POST api/fornitore/prodotto/crea (application/json)
+        ProdottoBuilder -> CreaProdotto: POST api/fornitore/prodotto/crea (JSON)
 
-        CreaProdotto -> CreaProdotto: doPost()
-        CreaProdotto -> CreaProdotto: riconosce il flusso JSON del builder
-        CreaProdotto -> CreaProdotto: gestisciCreazioneCompostoDaJson()
-        CreaProdotto -> CreaProdotto: deserializza il payload JSON
-        CreaProdotto -> CreaProdotto: validaNodoBuilder(root, 1)
+        CreaProdotto -> CreaProdotto: doPost() + lettura payload builder
+        CreaProdotto -> CreaProdotto: valida nodo ed eliminazioni
         CreaProdotto -> ProdottoDAO: existsByCodice(root.codice)
         ProdottoDAO --> CreaProdotto: esito
-        CreaProdotto -> CreaProdotto: validaEliminazioni(...)
 
-        alt errore di validazione server
+        alt errore server
             CreaProdotto --> ProdottoBuilder: errore HTTP + JSON
             ProdottoBuilder -> Main: parseJsonResponse(response)
             Main --> ProdottoBuilder: eccezione
@@ -443,26 +437,15 @@ else bozza presente
         else payload valido
             CreaProdotto -> CreaProdotto: apre transazione
 
-            opt ci sono eliminazioni richieste
-                CreaProdotto -> CreaProdotto: applicaEliminazioni(...)
+            opt eliminazioni richieste
                 CreaProdotto -> ProdottoDAO: elimina prodotti richiesti
                 CreaProdotto -> SKUDAO: elimina SKU richieste
             end
 
-            CreaProdotto -> CreaProdotto: persistiNodoBuilder(root, null, prodottoDAO)
-
-            group persistenza ricorsiva dell'albero
-                CreaProdotto -> ProdottoDAO: crea/aggiorna composto radice
-                CreaProdotto -> ProdottoDAO: collega eventuali figli al padre
-                CreaProdotto -> ProdottoDAO: crea/aggiorna nodi semplici e composti
-                CreaProdotto -> SKUDAO: crea eventuali nuove SKU
-                CreaProdotto -> ProdottoDAO: aggiunge/rimuove associazioni prodotto-SKU
-                CreaProdotto -> ProdottoDAO: scollega eventuali figli non più presenti
-            end
-
-            CreaProdotto -> CreaProdotto: commit transazione
+            CreaProdotto -> CreaProdotto: persiste ricorsivamente l'albero
+            CreaProdotto -> CreaProdotto: commit
             CreaProdotto -> ProdottoDAO: findByIdConDiscendenti(rootId)
-            ProdottoDAO --> CreaProdotto: prodottoCreato completo
+            ProdottoDAO --> CreaProdotto: prodotto completo
             CreaProdotto --> ProdottoBuilder: 200 + JSON prodottoCreato
 
             ProdottoBuilder -> Main: parseJsonResponse(response)
@@ -471,11 +454,11 @@ else bozza presente
             ProdottoBuilder -> Home: reset form-crea-composto
             ProdottoBuilder -> Main: mostraMessaggioHome("Prodotto composto salvato con successo.", "success")
 
-            alt risposta con prodotto creato
+            alt prodotto restituito
                 ProdottoBuilder -> ProdottoDettaglio: mostraDettaglioProdottoCreato(data)
                 ProdottoDettaglio -> Home: aggiorna dettaglio-content
-            else nessun dato restituito
-                ProdottoBuilder -> Home: mostra messaggio di salvataggio nel side-panel
+            else nessun prodotto restituito
+                ProdottoBuilder -> Home: mostra messaggio nel pannello dettaglio
             end
 
             par
@@ -489,6 +472,7 @@ else bozza presente
     end
 end
 @enduml
+
 
 Click tasto Ricerca Prodotti:-----------------------------------------------------------
 @startuml
