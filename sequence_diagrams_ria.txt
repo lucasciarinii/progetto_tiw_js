@@ -778,7 +778,7 @@ else click "-" su una SKU
 end
 @enduml
 
-Click tasto - (in dettaglio) :-------------------------------------------------------------------------
+Click tasto - (in dettaglio: SKU-PRODOTTO) :-------------------------------------------------------------------------
 @startuml
 actor Fornitore
 participant "fornitore.html" as Home
@@ -787,58 +787,59 @@ participant "prodotto-api.js" as Api
 participant "RimuoviAssociazione" as Servlet
 participant "ProdottoDAO" as DAO
 
-alt "-" su SKU
-    Fornitore -> Home: clicca "-"
-    Home -> Dettaglio: btnRimuovi
-    Dettaglio -> Api: rimuoviAssociazioneProdottoSku(prodottoId, skuId)
-    Api -> Servlet: POST tipoRelazione=PRODOTTO_SKU
+Fornitore -> Home: clicca "-"
+Home -> Dettaglio: btnRimuovi
+Dettaglio -> Api: rimuoviAssociazioneProdottoSku(prodottoId, skuId)
+Api -> Servlet: POST tipoRelazione=PRODOTTO_SKU
+Servlet -> DAO: findByIdConSKU(prodottoId)
+DAO --> Servlet: prodotto
+
+alt richiesta non valida
+    Servlet --> Api: errore JSON
+    Api --> Dettaglio: errore
+    Dettaglio -> Home: mostra errore
+else ok
+    Servlet -> DAO: removeSKUDaProdotto(prodottoId, skuId)
     Servlet -> DAO: findByIdConSKU(prodottoId)
-    DAO --> Servlet: prodotto
+    DAO --> Servlet: prodottoAggiornato
+    Servlet --> Api: JSON prodottoAggiornato
+    Api --> Dettaglio: risposta
+    Dettaglio -> Dettaglio: rerenderDaRisposta(...)
+    Dettaglio -> Api: caricaProdottiDisponibili()
+    Dettaglio -> Api: caricaSkuDisponibili()
+    Dettaglio -> Home: messaggio successo
+end
+@enduml
 
-    alt richiesta non valida
-        Servlet --> Api: errore JSON
-        Api --> Dettaglio: errore
-        Dettaglio -> Home: mostra errore
-    else ok
-        Servlet -> DAO: removeSKUDaProdotto(prodottoId, skuId)
-        Servlet -> DAO: findByIdConSKU(prodottoId)
-        DAO --> Servlet: prodottoAggiornato
-        Servlet --> Api: JSON prodottoAggiornato
-        Api --> Dettaglio: risposta
-        Dettaglio -> Dettaglio: rerenderDaRisposta(...)
-                Dettaglio -> Dettaglio: rerenderDaRisposta(...)
+Click tasto - (in dettaglio: COMPOSTO-SOTTOPRODOTTO) :-------------------------------------------------------------------------
+@startuml
+actor Fornitore
+participant "fornitore.html" as Home
+participant "prodotto-dettaglio.js" as Dettaglio
+participant "prodotto-api.js" as Api
+participant "RimuoviAssociazione" as Servlet
+participant "ProdottoDAO" as DAO
 
-        par refresh liste
-            Dettaglio -> Api: caricaProdottiDisponibili()
-        else
-            Dettaglio -> Api: caricaSkuDisponibili()
-        end
+Fornitore -> Home: clicca "-"
+Home -> Dettaglio: btnRimuovi
+Dettaglio -> Api: rimuoviAssociazionePadreFiglio(figlioId, padreId)
+Api -> Servlet: POST tipoRelazione=PADRE_FIGLIO
+Servlet -> DAO: findById(figlioId)
+DAO --> Servlet: figlio
 
-        Dettaglio -> Home: messaggio successo
-    end
-
-else "-" su sottoprodotto
-    Fornitore -> Home: clicca "-"
-    Home -> Dettaglio: btnRimuovi
-    Dettaglio -> Api: rimuoviAssociazionePadreFiglio(figlioId, padreId)
-    Api -> Servlet: POST tipoRelazione=PADRE_FIGLIO
-    Servlet -> DAO: findById(figlioId)
-    DAO --> Servlet: figlio
-
-    alt richiesta non valida
-        Servlet --> Api: errore JSON
-        Api --> Dettaglio: errore
-        Dettaglio -> Home: mostra errore
-    else ok
-        Servlet -> DAO: removePadre(figlioId)
-        Servlet -> DAO: findByIdConDiscendenti(padreId)
-        DAO --> Servlet: padreAggiornato
-        Servlet --> Api: JSON padreAggiornato
-        Api --> Dettaglio: risposta
-        Dettaglio -> Dettaglio: rerenderDaRisposta(...)
-        Dettaglio -> Api: caricaProdottiDisponibili()
-        Dettaglio -> Home: messaggio successo
-    end
+alt richiesta non valida
+    Servlet --> Api: errore JSON
+    Api --> Dettaglio: errore
+    Dettaglio -> Home: mostra errore
+else ok
+    Servlet -> DAO: removePadre(figlioId)
+    Servlet -> DAO: findByIdConDiscendenti(padreId)
+    DAO --> Servlet: padreAggiornato
+    Servlet --> Api: JSON padreAggiornato
+    Api --> Dettaglio: risposta
+    Dettaglio -> Dettaglio: rerenderDaRisposta(...)
+    Dettaglio -> Api: caricaProdottiDisponibili()
+    Dettaglio -> Home: messaggio successo
 end
 @enduml
 
@@ -855,27 +856,22 @@ alt SKU esistente
     Fornitore -> Builder: seleziona "SKU esistente"
     Builder -> ProdottoPage: getState()
     ProdottoPage --> Builder: state
-
-    Builder -> Builder: trovaNodoBuilder(state.builderState, nodeClientId)
+    Builder -> Builder: trovaNodoBuilder(...)
 
     alt nodo non valido
         Builder --> Fornitore: nessuna azione
     else cache SKU vuota
-        Builder -> ProdottoPage: mostraMessaggioHome("Non ci sono SKU disponibili da associare.", "error")
+        Builder -> ProdottoPage: mostraMessaggioHome("Nessuna SKU disponibile", "error")
     else nodo valido
-        Builder -> Fornitore: prompt "Id SKU da associare"
+        Builder -> Fornitore: inserisce id SKU da associare
 
         alt scelta annullata
             Builder --> Fornitore: nessuna modifica
-        else SKU non valida
-            Builder -> ProdottoPage: mostraMessaggioHome("SKU selezionata non valida.", "error")
-        else SKU già associata
-            Builder -> ProdottoPage: mostraMessaggioHome("Questa SKU è già associata al prodotto semplice.", "error")
+        else SKU non valida o già associata
+            Builder -> ProdottoPage: mostraMessaggioHome("SKU non valida o già associata", "error")
         else SKU valida
             Builder -> Builder: nodo.skuList.push(SKU selezionata)
             Builder -> Builder: renderBuilder()
-            Builder -> ProdottoPage: getState()
-            ProdottoPage --> Builder: state aggiornato
         end
     end
 
@@ -883,26 +879,18 @@ else Nuova SKU
     Fornitore -> Builder: seleziona "Nuova SKU"
     Builder -> ProdottoPage: getState()
     ProdottoPage --> Builder: state
-
-    Builder -> Builder: trovaNodoBuilder(state.builderState, nodeClientId)
+    Builder -> Builder: trovaNodoBuilder(...)
 
     alt nodo non valido
         Builder --> Fornitore: nessuna azione
     else nodo valido
-        Builder -> Fornitore: prompt "Codice"
-        Builder -> Fornitore: prompt "Nome"
-        Builder -> Fornitore: prompt "Descrizione tecnica"
-        Builder -> Fornitore: prompt "Prezzo"
+        Builder -> Fornitore: inserisce dati nuova SKU
 
-        alt dati non validi o annullati
-            Builder -> ProdottoPage: mostraMessaggioHome("Dati della nuova SKU non validi.", "error")
-        else codice duplicato nel nodo
-            Builder -> ProdottoPage: mostraMessaggioHome("Nel nodo è già presente una SKU con questo codice.", "error")
+        alt dati non validi o codice duplicato
+            Builder -> ProdottoPage: mostraMessaggioHome("Dati SKU non validi", "error")
         else dati validi
             Builder -> Builder: nodo.skuList.push(nuova SKU)
             Builder -> Builder: renderBuilder()
-            Builder -> ProdottoPage: getState()
-            ProdottoPage --> Builder: state aggiornato
         end
     end
 end
@@ -921,22 +909,18 @@ alt sottoprodotto semplice
     Fornitore -> Builder: seleziona "Sottoprodotto semplice"
     Builder -> ProdottoPage: getState()
     ProdottoPage --> Builder: state
-
-    Builder -> Builder: trovaNodoBuilder(state.builderState, parentClientId)
+    Builder -> Builder: trovaNodoBuilder(...)
 
     alt padre non valido
         Builder --> Fornitore: nessuna azione
     else padre valido
-        Builder -> Fornitore: prompt "Codice"
-        Builder -> Fornitore: prompt "Nome"
+        Builder -> Fornitore: inserisce dati nuovo prodotto semplice
 
         alt dati non validi o annullati
             Builder -> ProdottoPage: mostraMessaggioHome("Dati del nuovo prodotto semplice non validi.", "error")
         else dati validi
             Builder -> Builder: padre.figli.push(nuovo prodotto semplice)
             Builder -> Builder: renderBuilder()
-            Builder -> ProdottoPage: getState()
-            ProdottoPage --> Builder: state aggiornato
         end
     end
 
@@ -944,25 +928,18 @@ else sottoprodotto composto
     Fornitore -> Builder: seleziona "Sottoprodotto composto"
     Builder -> ProdottoPage: getState()
     ProdottoPage --> Builder: state
-
-    Builder -> Builder: trovaNodoBuilder(state.builderState, parentClientId)
+    Builder -> Builder: trovaNodoBuilder(...)
 
     alt padre non valido
         Builder --> Fornitore: nessuna azione
     else padre valido
-        Builder -> Fornitore: prompt "Codice"
-        Builder -> Fornitore: prompt "Nome"
-        Builder -> Fornitore: prompt "Descrizione"
-        Builder -> Fornitore: prompt "Prezzo minimo"
-        Builder -> Fornitore: prompt "Prezzo massimo"
+        Builder -> Fornitore: inserisce dati nuovo prodotto composto
 
         alt dati non validi o annullati
             Builder -> ProdottoPage: mostraMessaggioHome("Dati del nuovo prodotto composto non validi.", "error")
         else dati validi
             Builder -> Builder: padre.figli.push(nuovo prodotto composto)
             Builder -> Builder: renderBuilder()
-            Builder -> ProdottoPage: getState()
-            ProdottoPage --> Builder: state aggiornato
         end
     end
 end
