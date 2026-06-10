@@ -102,7 +102,9 @@ window.prodottoDettaglio = (function () {
 
         const titolo = document.createElement('h3');
         titolo.className = 'section-title';
-        titolo.textContent = 'Dettaglio prodotto';
+        titolo.textContent = prodotto?.nome && String(prodotto.nome).trim()
+            ? prodotto.nome
+            : 'Dettaglio prodotto';
         wrapper.appendChild(titolo);
 
         // Campo nome modificabile inline.
@@ -509,6 +511,5 @@ window.prodottoDettaglio = (function () {
     return {
         mostraDettaglioProdottoCreato,
         renderDettaglioProdottoInContainer,
-
     };
 })();
