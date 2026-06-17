@@ -431,6 +431,7 @@ window.prodottoBuilder = (function () {
         card.appendChild(azioni);
         card.appendChild(menu);
 
+        //Chiusura ricorsione su foglia (prodotto semplice)
         if (nodo.tipo === 'SEMPLICE') {
             // Elenco SKU del prodotto semplice.
             const bloccoSku = document.createElement('div');
@@ -470,6 +471,7 @@ window.prodottoBuilder = (function () {
             card.appendChild(bloccoSku);
         }
 
+        //Chiamata ricorsiva, se mi trovo in un prodotto composto
         if (nodo.tipo === 'COMPOSTO' && Array.isArray(nodo.figli) && nodo.figli.length > 0) {
             // Render ricorsivo dei figli del composto.
             const figliWrap = document.createElement('div');

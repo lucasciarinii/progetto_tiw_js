@@ -64,9 +64,8 @@ public class CreaProdotto extends BaseApiServlet {
     }
 
     /**
-     * Flusso classico:
-     * - prodotto semplice creato da form tradizionale
-     * - prodotto composto "flat" creato da form tradizionale
+     * Controllo parametri
+     * - indirizzamento verso CreaProdottoSemplice
      */
     private void gestisciCreazioneDaParametri(HttpServletRequest req, HttpServletResponse resp)
             throws SQLException, IOException {
@@ -106,19 +105,9 @@ public class CreaProdotto extends BaseApiServlet {
             return;
         }
 
-        String tipoPulito = normalize(tipo);
 
-        // Smistamento in base al tipo richiesto.
-        if ("SEMPLICE".equals(tipoPulito)) {
-            creaProdottoSemplice(req, resp, prodottoDAO, codice, nome.trim());
-            return;
-        }
-        if ("COMPOSTO".equals(tipoPulito)) {
-            creaProdottoCompostoFlat(req, resp, prodottoDAO, codice, nome.trim());
-            return;
-        }
+        creaProdottoSemplice(req, resp, prodottoDAO, codice, nome.trim());
 
-        sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Tipo prodotto non valido");
     }
 
     /**
@@ -164,114 +153,6 @@ public class CreaProdotto extends BaseApiServlet {
         sendJson(resp, prodottoCreato);
     }
 
-    /**
-     * Creazione tradizionale di un composto "flat".
-     *-
-     * Il composto è nuovo, mentre i figli selezionati sono prodotti
-     * già esistenti e senza padre.
-     */
-    private void creaProdottoCompostoFlat(HttpServletRequest req, HttpServletResponse resp,
-                                          ProdottoDAO prodottoDAO, int codice, String nome)
-            throws SQLException, IOException {
-
-        // Campi specifici del prodotto composto.
-        String descrizione = req.getParameter("descrizione");
-        String prezzoMinParam = req.getParameter("prezzoMin");
-        String prezzoMaxParam = req.getParameter("prezzoMax");
-        String[] figlioIdParams = req.getParameterValues("figlioIds");
-
-        // Tutti questi campi devono essere presenti.
-        if (isBlank(descrizione) || isBlank(prezzoMinParam) || isBlank(prezzoMaxParam)) {
-            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                    "Compila tutti i campi del prodotto composto");
-            return;
-        }
-
-        // Un composto deve avere almeno un sottoprodotto.
-        if (figlioIdParams == null || figlioIdParams.length == 0) {
-            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                    "Seleziona almeno un sottoprodotto");
-            return;
-        }
-
-        double prezzoMin;
-        double prezzoMax;
-        try {
-            prezzoMin = Double.parseDouble(prezzoMinParam.trim());
-            prezzoMax = Double.parseDouble(prezzoMaxParam.trim());
-        } catch (NumberFormatException e) {
-            sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Fascia di prezzo non valida");
-            return;
-        }
-
-        // Controllo della fascia di prezzo.
-        if (prezzoMin < 0 || prezzoMax < 0) {
-            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                    "I prezzi devono essere maggiori o uguali a 0");
-            return;
-        }
-        if (prezzoMin > prezzoMax) {
-            sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                    "Il prezzo minimo non può essere maggiore del massimo");
-            return;
-        }
-
-        Set<Integer> figlioIds = new LinkedHashSet<>();
-
-        // LinkedHashSet evita duplicati e mantiene un ordine stabile.
-        for (String figlioIdParam : figlioIdParams) {
-            try {
-                figlioIds.add(Integer.parseInt(figlioIdParam.trim()));
-            } catch (NumberFormatException e) {
-                sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                        "Uno dei sottoprodotti selezionati non è valido");
-                return;
-            }
-        }
-
-        // Prima della creazione verifico che ogni figlio sia valido.
-        for (Integer figlioId : figlioIds) {
-            Prodotto figlio = prodottoDAO.findById(figlioId);
-
-            if (figlio == null) {
-                sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                        "Uno dei sottoprodotti selezionati non esiste");
-                return;
-            }
-
-            // Nel flusso flat il figlio deve essere top-level.
-            if (figlio.getPadreId() != null) {
-                sendError(resp, HttpServletResponse.SC_BAD_REQUEST,
-                        "Uno dei sottoprodotti selezionati ha già un padre");
-                return;
-            }
-
-            // Verifico che il sottoalbero del figlio, una volta collegato,
-            // non faccia superare la profondità massima consentita.
-            int altezzaSottoalbero = prodottoDAO.getSubtreeHeight(figlioId);
-            if (altezzaSottoalbero + 1 > MAX_PROFONDITA) {
-                sendError(resp, HttpServletResponse.SC_BAD_REQUEST, "Profondità massima superata");
-                return;
-            }
-        }
-
-        // Creo il composto e poi collego i figli.
-        int prodottoId = prodottoDAO.createProdottoComposto(
-                codice,
-                nome,
-                descrizione.trim(),
-                prezzoMin,
-                prezzoMax
-        );
-
-        for (Integer figlioId : figlioIds) {
-            prodottoDAO.setPadre(figlioId, prodottoId);
-        }
-
-        // Restituisco il composto con i discendenti già caricati.
-        Prodotto prodottoCreato = prodottoDAO.findByIdConDiscendenti(prodottoId);
-        sendJson(resp, prodottoCreato);
-    }
 
     /**
      * Flusso nuovo del builder JS.

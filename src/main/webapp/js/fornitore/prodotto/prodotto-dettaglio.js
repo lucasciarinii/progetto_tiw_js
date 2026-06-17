@@ -34,6 +34,7 @@ window.prodottoDettaglio = (function () {
         mostraMessaggioPerContainer(container, messaggio, 'success');
     }
 
+    //Funzione di controllo per verificare se la risposta dopo una modifica inline contiene il prodotto aggiornato
     function estraiProdottoAggiornato(risposta) {
         // Prova a individuare il prodotto aggiornato dentro la risposta del server.
         if (!risposta) return null;
@@ -44,6 +45,8 @@ window.prodottoDettaglio = (function () {
         return null;
     }
 
+    //Funzione chiamata in assenza di prodotto aggiornato nella risposta dopo modifica inline del attributo di una sku,
+    //recupera dettaglio aggiornato del padre dell oggetto modificato
     async function refreshContenitoreDaPadre(prodottoId, container) {
         // Ricarica il dettaglio del prodotto partendo dal suo id.
         if (!prodottoId || !container) {
@@ -61,6 +64,7 @@ window.prodottoDettaglio = (function () {
         }
     }
 
+    //Funzione di smistamento: se ricevo in risposta da server il prodotto aggiornato lo mostro, altrimenti ricarico il dettaglio del padre (che quindi conterà il figlio aggiornato)
     async function rerenderDaRisposta(risposta, prodottoPadreId, container) {
         // Se il server restituisce già il prodotto aggiornato uso quello,
         // altrimenti provo a ricaricarlo dal server.
@@ -73,6 +77,7 @@ window.prodottoDettaglio = (function () {
         await refreshContenitoreDaPadre(prodottoPadreId, container);
     }
 
+    //Chiudo builder e vado verso render effettivo del dettaglio
     function mostraDettaglioProdottoCreato(prodotto, container = getState().dettaglioContent) {
         const state = getState();
 
@@ -82,6 +87,9 @@ window.prodottoDettaglio = (function () {
         renderDettaglioProdottoInContainer(prodotto, container);
     }
 
+    //Render effettivo del dettaglio prodotto:
+    //1) Prima renderizzo la parte condivisa del dettaglio sia per semplici che per composti (titolo, campi nome e codice)
+    //2) Poi, in base al tipo del prodotto, renderizzo la parte specifica per semplici o composti (SKU associate per i semplici, campi descrizione/prezzo e figli per i composti)
     function renderDettaglioProdottoInContainer(prodotto, container) {
         if (!container) {
             return;
@@ -144,6 +152,8 @@ window.prodottoDettaglio = (function () {
         tipo.innerHTML = `Tipo: ${window.prodottoUi.escapeHtml(prodotto.tipo)}`;
         wrapper.appendChild(tipo);
 
+        //Se semplice prima renderizzo il blocco per le sku associate e poi il blocco per le azioni,
+        // se composto prima renderizzo i campi specifici e poi il blocco per le azioni
         if (prodotto.tipo === 'SEMPLICE') {
             renderBloccoSkuProdottoSemplice(wrapper, prodotto, container);
         } else {
@@ -216,11 +226,14 @@ window.prodottoDettaglio = (function () {
             return;
         }
 
+        //Dopo aver creato la sezione per le sku renderizzo riga editabile per ogni sku associata al prodotto semplice
         prodotto.skuList.forEach((sku) => {
             wrapper.appendChild(renderRigaSkuDettaglio(sku, prodotto, container));
         });
     }
 
+    //Finisco di renderizzare il blocco per il prodotto composto, poi per ogni figlio richiamo il render ricorsivo: renderNodoDettaglioProdotto,
+    //per renderizzare il dettaglio del figlio (che può essere semplice o composto)
     function renderBloccoProdottoComposto(wrapper, prodotto, container) {
         // Campi specifici del prodotto composto.
         wrapper.appendChild(
@@ -272,7 +285,11 @@ window.prodottoDettaglio = (function () {
         wrapper.appendChild(blocco);
     }
 
+    //Render ricorsivo per nodi prodotto semplice/composto
     function renderNodoDettaglioProdotto(nodo, padreId, container) {
+
+        const inRicerca = isContainerRicerca(container);
+
         // Render di un nodo dell'albero prodotto.
         const card = document.createElement('div');
         card.className = 'tree-node';
@@ -281,6 +298,11 @@ window.prodottoDettaglio = (function () {
         card.appendChild(
             window.prodottoUi.creaRigaCampoProdotto('Nome', nodo.nome, async (nuovoValore) => {
                 const risposta = await window.prodottoApi.aggiornaCampoProdotto(nodo.id, 'nome', nuovoValore);
+
+                if (inRicerca && window.ricercaPage?.aggiornaRisultatoInLista) {
+                    window.ricercaPage.aggiornaRisultatoInLista(nodo.id, 'PRODOTTO', { nome: nuovoValore });
+                }
+
                 await rerenderDaRisposta(risposta, padreId, container);
                 await window.prodottoApi.caricaProdottiDisponibili();
             })
@@ -294,6 +316,11 @@ window.prodottoDettaglio = (function () {
                 }
 
                 const risposta = await window.prodottoApi.aggiornaCampoProdotto(nodo.id, 'codice', numero);
+
+                if (inRicerca && window.ricercaPage?.aggiornaRisultatoInLista) {
+                    window.ricercaPage.aggiornaRisultatoInLista(nodo.id, 'PRODOTTO', { codice: numero });
+                }
+
                 await rerenderDaRisposta(risposta, padreId, container);
                 await window.prodottoApi.caricaProdottiDisponibili();
             })
@@ -423,6 +450,8 @@ window.prodottoDettaglio = (function () {
     }
 
     function renderRigaSkuDettaglio(sku, prodottoPadre, container) {
+        const inRicerca = isContainerRicerca(container);
+
         // Render di una SKU nel dettaglio del prodotto semplice.
         const riga = document.createElement('div');
         riga.className = 'tree-sku-row';
@@ -432,11 +461,21 @@ window.prodottoDettaglio = (function () {
 
         info.appendChild(window.prodottoUi.creaRigaCampoSku('Codice', sku.codice, async (valore) => {
             const aggiornato = await window.prodottoApi.aggiornaCampoSku(sku.id, 'codice', valore);
+
+            if (inRicerca && window.ricercaPage?.aggiornaRisultatoInLista) {
+                window.ricercaPage.aggiornaRisultatoInLista(sku.id, 'SKU', { codice: valore });
+            }
+
             await rerenderDaRisposta(aggiornato, prodottoPadre.id, container);
         }));
 
         info.appendChild(window.prodottoUi.creaRigaCampoSku('Nome', sku.nome, async (valore) => {
             const aggiornato = await window.prodottoApi.aggiornaCampoSku(sku.id, 'nome', valore);
+
+            if (inRicerca && window.ricercaPage?.aggiornaRisultatoInLista) {
+                window.ricercaPage.aggiornaRisultatoInLista(sku.id, 'SKU', { nome: valore });
+            }
+
             await rerenderDaRisposta(aggiornato, prodottoPadre.id, container);
         }));
 

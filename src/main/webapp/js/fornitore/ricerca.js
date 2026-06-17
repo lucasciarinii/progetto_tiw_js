@@ -136,6 +136,7 @@ window.ricercaPage = (function () {
         return risultati;
     }
 
+    //Imposta messaggio guida iniziale per la ricerca
     function renderStatoIniziale() {
         if (!risultatiContainer) {
             return;
@@ -178,6 +179,8 @@ window.ricercaPage = (function () {
             button.type = 'button';
             button.className = 'result-link';
 
+
+            //Se ho gia selezionato un prodotto/sku e lo sto visualizzando nel dettaglio, lo evidenzio nella lista dei risultati
             if (
                 stato.selezionato &&
                 String(stato.selezionato.id) === String(item.id) &&
@@ -227,7 +230,7 @@ window.ricercaPage = (function () {
         // e mostro un placeholder nel pannello dettaglio.
         stato.selezionato = item;
         stato.dettaglioCompleto = null;
-        renderRisultati();
+        renderRisultati(); //Per rendere subito l'effetto di selezione nella lista dei risultati
         renderDettaglioCaricamento(item);
 
         try {
@@ -274,6 +277,7 @@ window.ricercaPage = (function () {
         renderDettaglioProdottoRicerca(item);
     }
 
+    //Messaggio di caricamento durante il fetch del dettaglio completo, per migliorare l'esperienza utente in caso di lentezza di rete o server
     function renderDettaglioCaricamento(item) {
         if (!dettaglioContainer) {
             return;

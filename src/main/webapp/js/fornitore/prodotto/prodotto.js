@@ -66,7 +66,7 @@ window.prodottoPage = (function () {
     return {
         init,
         getState,
-// Shortcut utile per forzare il refresh della lista SKU.
+        // Shortcut utile per forzare il refresh della lista SKU.
         caricaSkuDisponibili: () => window.prodottoApi.caricaSkuDisponibili(),
 
         // Shortcut verso il modulo dettaglio prodotto.
