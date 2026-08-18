@@ -332,7 +332,7 @@ The main scenarios covered by the application include:
 │           │   └── fornitore/           # Supplier-side JavaScript
 │           ├── assets/                   # CSS and static assets
 │           └── WEB-INF/                 # Web application configuration
-├── utilities/                            # Supporting utilities
+├── tiw_documentazione_gruppo7.pdf        # PDF Report
 ├── .mvn/                                 # Maven Wrapper configuration
 ├── mvnw                                  # Maven Wrapper for Unix systems
 ├── mvnw.cmd                              # Maven Wrapper for Windows
